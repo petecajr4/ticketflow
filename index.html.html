@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TicketFlow — Gestão de Visitas</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0b0d12; --s1:#13161f; --s2:#1a1e2a; --s3:#222638; --s4:#2a3050;
+  --border:#2e3450; --border2:#3a4268;
+  --accent:#5b8aff; --accent2:#8b5bff; --accentg:linear-gradient(135deg,#5b8aff,#8b5bff);
+  --green:#1fd080; --yellow:#f5b731; --red:#ff4a6b; --orange:#ff8c42;
+  --text:#eef0fa; --t2:#8899c0; --t3:#4a5478; --t4:#2a3050;
+  --r:14px; --r2:10px; --r3:8px;
+  --sh:0 8px 32px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+/* ══ LOGIN ══ */
+#loginScreen{
+  display:flex;align-items:center;justify-content:center;min-height:100vh;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(91,138,255,.15) 0%,transparent 70%);
+}
+.login-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:24px;
+  padding:48px 40px;width:100%;max-width:420px;
+  box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(91,138,255,.08);
+  animation:fadeUp .4s ease;
+}
+@keyframes fadeUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.login-brand{text-align:center;margin-bottom:36px;}
+.login-brand .brand-icon{
+  width:68px;height:68px;margin:0 auto 16px;
+  background:var(--accentg);border-radius:18px;
+  display:flex;align-items:center;justify-content:center;font-size:2rem;
+  box-shadow:0 8px 32px rgba(91,138,255,.4);
+}
+.login-brand h1{font-family:'Syne',sans-serif;font-weight:800;font-size:1.8rem;letter-spacing:-.02em;}
+.login-brand p{color:var(--t2);font-size:.88rem;margin-top:6px;}
+.lf{margin-bottom:18px;}
+.lf label{display:block;font-size:.75rem;font-weight:600;color:var(--t2);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em;}
+.lf select,.lf input{
+  width:100%;padding:13px 16px;background:var(--s2);border:1px solid var(--border);
+  border-radius:var(--r3);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.92rem;
+  outline:none;transition:border-color .15s,box-shadow .15s;
+}
+.lf select:focus,.lf input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,138,255,.12);}
+.lf select option{background:var(--s2);}
+.login-err{background:rgba(255,74,107,.1);border:1px solid rgba(255,74,107,.3);border-radius:var(--r3);padding:10px 14px;font-size:.84rem;color:var(--red);margin-bottom:16px;display:none;}
+.btn-login{
+  width:100%;padding:14px;background:var(--accentg);color:#fff;border:none;
+  border-radius:var(--r3);font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;
+  cursor:pointer;transition:transform .15s,box-shadow .15s;margin-top:4px;
+  box-shadow:0 4px 20px rgba(91,138,255,.35);
+}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(91,138,255,.45);}
+
+/* ══ LAYOUT ══ */
+#app{display:none;}
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:60px;background:var(--s1);
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(12px);
+}
+.brand{font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;display:flex;align-items:center;gap:10px;}
+.brand-dot{width:34px;height:34px;background:var(--accentg);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;box-shadow:0 4px 12px rgba(91,138,255,.3);}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.user-pill{display:flex;align-items:center;gap:9px;background:var(--s2);border:1px solid var(--border);border-radius:30px;padding:6px 14px;font-size:.83rem;}
+.badge{font-size:.67rem;padding:2px 8px;border-radius:20px;font-weight:700;letter-spacing:.03em;}
+.badge-admin{background:linear-gradient(135deg,rgba(91,138,255,.25),rgba(139,91,255,.25));color:var(--accent);border:1px solid rgba(91,138,255,.3);}
+.badge-vendas{background:rgba(31,208,128,.12);color:var(--green);border:1px solid rgba(31,208,128,.25);}
+.btn{padding:7px 16px;border-radius:var(--r3);border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.83rem;font-weight:500;transition:all .15s;}
+.btn-accent{background:var(--accentg);color:#fff;box-shadow:0 3px 12px rgba(91,138,255,.3);}
+.btn-accent:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(91,138,255,.4);}
+.btn-ghost{background:transparent;color:var(--t2);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--s2);color:var(--text);}
+.btn-danger{background:rgba(255,74,107,.1);color:var(--red);border:1px solid rgba(255,74,107,.25);}
+.btn-danger:hover{background:rgba(255,74,107,.2);}
+.btn-green{background:rgba(31,208,128,.12);color:var(--green);border:1px solid rgba(31,208,128,.25);}
+.btn-green:hover{background:rgba(31,208,128,.2);}
+
+/* ══ TABS ══ */
+.nav-tabs{display:flex;gap:2px;padding:0 28px;background:var(--s1);border-bottom:1px solid var(--border);}
+.nav-tab{padding:10px 18px;border:none;background:transparent;color:var(--t2);font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px;}
+.nav-tab:hover{color:var(--text);}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ══ STATS ══ */
+.stats-row{display:flex;gap:12px;padding:20px 28px;overflow-x:auto;}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;min-width:160px;flex:1;transition:border-color .15s;}
+.stat-card:hover{border-color:var(--border2);}
+.stat-label{font-size:.74rem;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.stat-value{font-family:'Syne',sans-serif;font-weight:700;font-size:1.8rem;line-height:1;}
+.stat-sub{font-size:.75rem;color:var(--t3);margin-top:4px;}
+
+/* ══ TOOLBAR ══ */
+.toolbar{display:flex;align-items:center;justify-content:space-between;padding:12px 28px;flex-wrap:wrap;gap:10px;}
+.toolbar-left{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;}
+.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.search{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r3);padding:7px 13px;}
+.search input{background:none;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.85rem;width:180px;}
+.search input::placeholder{color:var(--t3);}
+.fselect{background:var(--s2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:var(--r3);font-family:'DM Sans',sans-serif;font-size:.82rem;outline:none;cursor:pointer;}
+
+/* ══ KANBAN ══ */
+.board-wrap{padding:0 28px 60px;overflow-x:auto;}
+.board{display:flex;gap:16px;min-width:max-content;padding-bottom:8px;}
+.col{width:310px;flex-shrink:0;}
+.col-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--s2);border-radius:var(--r);border:1px solid var(--border);margin-bottom:10px;}
+.col-title{display:flex;align-items:center;gap:9px;font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;}
+.col-pip{width:10px;height:10px;border-radius:50%;}
+.col-n{font-size:.73rem;color:var(--t2);background:var(--s3);padding:2px 8px;border-radius:20px;}
+.col-body{display:flex;flex-direction:column;gap:10px;min-height:80px;border-radius:var(--r);padding:2px;transition:background .2s;}
+.col-body.dragover{background:rgba(91,138,255,.07);outline:2px dashed var(--accent);outline-offset:2px;}
+
+/* ══ TICKET CARD ══ */
+.tcard{
+  background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  padding:15px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;
+  position:relative;overflow:hidden;
+}
+.tcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+.tcard:hover{transform:translateY(-2px);box-shadow:var(--sh);border-color:var(--border2);}
+.tcard.urg-red::before{background:var(--red);}
+.tcard.urg-yellow::before{background:var(--yellow);}
+.tcard.urg-green::before{background:var(--green);}
+.tc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.tc-title{font-weight:600;font-size:.9rem;line-height:1.4;flex:1;}
+.urg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px;}
+.tc-id{font-size:.7rem;color:var(--t3);margin-bottom:6px;}
+.tc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
+.tag{font-size:.67rem;padding:2px 8px;border-radius:20px;font-weight:600;border:1px solid transparent;}
+.tc-meta{font-size:.75rem;color:var(--t2);display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+.tc-footer{display:flex;align-items:center;justify-content:space-between;}
+.timer{font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;padding:3px 10px;border-radius:20px;background:var(--s3);color:var(--t2);}
+.timer.hot{color:var(--red);background:rgba(255,74,107,.12);}
+.tc-parts{font-size:.73rem;color:var(--t3);}
+.add-ticket{
+  display:flex;align-items:center;gap:8px;padding:11px 14px;
+  background:transparent;border:1px dashed var(--border);border-radius:var(--r);
+  color:var(--t3);cursor:pointer;font-size:.83rem;font-family:'DM Sans',sans-serif;
+  transition:all .15s;width:100%;margin-top:4px;
+}
+.add-ticket:hover{border-color:var(--accent);color:var(--accent);background:rgba(91,138,255,.05);}
+.empty{text-align:center;padding:24px 10px;color:var(--t3);font-size:.8rem;}
+
+/* ══ MODAL ══ */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+.overlay.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:20px;width:100%;max-width:660px;margin:auto;box-shadow:0 32px 80px rgba(0,0,0,.7);animation:fadeUp .2s ease;}
+.modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:22px 24px 16px;border-bottom:1px solid var(--border);gap:12px;}
+.modal-hdr h2{font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;}
+.modal-hdr .sub{font-size:.76rem;color:var(--t2);margin-top:3px;}
+.mcl{background:var(--s2);border:none;color:var(--t2);cursor:pointer;width:30px;height:30px;border-radius:8px;font-size:.95rem;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.mcl:hover{background:var(--s3);color:var(--text);}
+.modal-body{padding:20px 24px;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:.74rem;font-weight:600;color:var(--t2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;}
+.field input,.field textarea,.field select{
+  width:100%;padding:10px 13px;background:var(--s2);border:1px solid var(--border);
+  border-radius:var(--r3);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .15s,box-shadow .15s;resize:vertical;
+}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,138,255,.1);}
+.field select option{background:var(--s2);}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+
+/* urgency picker */
+.urg-picker{display:flex;gap:8px;}
+.urg-btn{flex:1;padding:10px;border-radius:var(--r3);border:2px solid transparent;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:.82rem;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.urg-btn.u-green{background:rgba(31,208,128,.1);color:var(--green);border-color:rgba(31,208,128,.2);}
+.urg-btn.u-green.sel,.urg-btn.u-green:hover{background:rgba(31,208,128,.2);border-color:var(--green);}
+.urg-btn.u-yellow{background:rgba(245,183,49,.1);color:var(--yellow);border-color:rgba(245,183,49,.2);}
+.urg-btn.u-yellow.sel,.urg-btn.u-yellow:hover{background:rgba(245,183,49,.2);border-color:var(--yellow);}
+.urg-btn.u-red{background:rgba(255,74,107,.1);color:var(--red);border-color:rgba(255,74,107,.2);}
+.urg-btn.u-red.sel,.urg-btn.u-red:hover{background:rgba(255,74,107,.2);border-color:var(--red);}
+
+/* participants */
+.parts-wrap{display:flex;flex-wrap:wrap;gap:6px;}
+.part-chip{display:flex;align-items:center;gap:5px;background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:.78rem;cursor:pointer;transition:all .15s;}
+.part-chip:hover,.part-chip.sel{background:rgba(91,138,255,.15);border-color:var(--accent);color:var(--accent);}
+
+/* tags selector */
+.tags-wrap{display:flex;flex-wrap:wrap;gap:6px;}
+.tag-chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.76rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;opacity:.5;}
+.tag-chip.sel{opacity:1;}
+
+/* image upload */
+.img-upload{border:2px dashed var(--border);border-radius:var(--r3);padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;color:var(--t2);font-size:.84rem;}
+.img-upload:hover{border-color:var(--accent);}
+.img-upload input{display:none;}
+.img-preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.img-thumb{position:relative;width:72px;height:72px;border-radius:var(--r3);overflow:hidden;border:1px solid var(--border);}
+.img-thumb img{width:100%;height:100%;object-fit:cover;}
+.img-del{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);border:none;color:#fff;width:18px;height:18px;border-radius:4px;font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* valor */
+.val-input{position:relative;}
+.val-input::before{content:'R$';position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--t2);font-size:.88rem;pointer-events:none;}
+.val-input input{padding-left:38px;}
+
+/* comments */
+.comments{margin-top:20px;}
+.comments h3{font-family:'Syne',sans-serif;font-size:.85rem;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.comment-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.comment{background:var(--s2);border:1px solid var(--border);border-radius:var(--r2);padding:12px 14px;}
+.comment-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.comment-author{font-size:.76rem;font-weight:600;color:var(--accent);}
+.comment-date{font-size:.71rem;color:var(--t3);}
+.comment-text{font-size:.86rem;line-height:1.55;}
+.comment-img{margin-top:8px;}
+.comment-img img{max-width:100%;border-radius:var(--r3);border:1px solid var(--border);max-height:200px;object-fit:contain;}
+.cmt-del{background:none;border:none;color:var(--t3);cursor:pointer;font-size:.75rem;padding:2px 5px;border-radius:4px;transition:all .15s;}
+.cmt-del:hover{color:var(--red);background:rgba(255,74,107,.1);}
+.cmt-del:disabled{opacity:.3;cursor:not-allowed;}
+.cmt-input-area{display:flex;flex-direction:column;gap:8px;}
+.cmt-input-area textarea{width:100%;padding:10px 13px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r3);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;resize:none;transition:border-color .15s;}
+.cmt-input-area textarea:focus{border-color:var(--accent);}
+.cmt-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.cmt-attach{background:var(--s2);border:1px solid var(--border);border-radius:var(--r3);padding:7px 12px;font-size:.8rem;color:var(--t2);cursor:pointer;transition:all .15s;}
+.cmt-attach:hover{border-color:var(--accent);color:var(--accent);}
+.cmt-attach input{display:none;}
+
+.modal-ftr{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+.modal-ftr-right{display:flex;gap:8px;}
+
+/* ══ RELATÓRIOS ══ */
+#relTab{padding:24px 28px;}
+.rel-controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;align-items:center;}
+.rel-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:16px;}
+.rel-table{width:100%;border-collapse:collapse;font-size:.86rem;}
+.rel-table th{text-align:left;padding:10px 14px;font-size:.73rem;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);}
+.rel-table td{padding:11px 14px;border-bottom:1px solid var(--border);}
+.rel-table tr:last-child td{border-bottom:none;}
+.rel-table tr:hover td{background:var(--s2);}
+.rel-sum{background:var(--s2);border:1px solid var(--border);border-radius:var(--r2);padding:14px 20px;display:inline-flex;gap:32px;margin-top:16px;}
+.rel-sum-item .lbl{font-size:.74rem;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;}
+.rel-sum-item .val{font-family:'Syne',sans-serif;font-weight:700;font-size:1.2rem;margin-top:2px;}
+
+/* ══ TAGS ADMIN ══ */
+#tagsTab{padding:24px 28px;}
+.tag-mgr{max-width:500px;}
+.tag-mgr h2{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:16px;}
+.tag-list-admin{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+.tag-row{display:flex;align-items:center;justify-content:space-between;background:var(--s1);border:1px solid var(--border);border-radius:var(--r3);padding:10px 14px;}
+.tag-row-left{display:flex;align-items:center;gap:10px;}
+.color-dot{width:14px;height:14px;border-radius:50%;}
+.tag-new-form{display:flex;gap:8px;align-items:flex-end;}
+.tag-new-form input{flex:1;padding:9px 12px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r3);color:var(--text);font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;}
+.tag-new-form input:focus{border-color:var(--accent);}
+.color-picker-wrap{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.color-opt{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s;}
+.color-opt.sel{border-color:#fff;transform:scale(1.2);}
+
+/* ══ ARQUIVO (finalizados/excluídos - admin only) ══ */
+#arquivoTab{padding:24px 28px;}
+
+/* ══ PRINT ══ */
+@media print {
+  body{background:#fff;color:#000;}
+  header,.nav-tabs,.toolbar,.board-wrap,#loginScreen,.overlay,#relTab .rel-controls,.modal-ftr,.btn,button{display:none!important;}
+  #printArea{display:block!important;}
+  .print-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .print-table th,.print-table td{padding:7px 10px;border:1px solid #ddd;text-align:left;}
+  .print-table th{background:#f0f0f0;font-weight:600;}
+}
+#printArea{display:none;}
+
+/* ══ NOTIF ══ */
+.notif{position:fixed;bottom:24px;right:24px;background:var(--s2);border:1px solid var(--green);border-radius:var(--r2);padding:12px 20px;font-size:.85rem;color:var(--green);z-index:999;display:none;box-shadow:var(--sh);animation:fadeUp .2s ease;}
+.notif.err{border-color:var(--red);color:var(--red);}
+.notif.warn{border-color:var(--yellow);color:var(--yellow);}
+
+/* ══ MISC ══ */
+.loader{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:3px;}
+.sep{height:1px;background:var(--border);margin:16px 0;}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:.75rem;color:var(--t2);}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-icon">🎯</div>
+      <h1>TicketFlow</h1>
+      <p>Gestão de visitas e atendimentos</p>
+    </div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="lf">
+      <label>Quem é você?</label>
+      <select id="loginUser">
+        <option value="">— Selecione seu nome —</option>
+        <option value="Bruno">Bruno</option>
+        <option value="Rodrigo">Rodrigo</option>
+        <option value="Junior">Junior</option>
+        <option value="Denis">Denis</option>
+        <option value="Reginaldo">Reginaldo</option>
+        <option value="Anderson">Anderson</option>
+        <option value="Anne">Anne</option>
+        <option value="Lex">Lex</option>
+        <option value="Emerson">Emerson</option>
+        <option value="Cassia">Cassia</option>
+        <option value="Anna">Anna</option>
+      </select>
+    </div>
+    <div class="lf">
+      <label>Senha</label>
+      <input type="password" id="loginPass" placeholder="Digite sua senha" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Entrar →</button>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <header>
+    <div class="brand"><div class="brand-dot">🎯</div>TicketFlow</div>
+    <div class="hdr-right">
+      <div class="user-pill">
+        <span id="hdrName"></span>
+        <span class="badge" id="hdrBadge"></span>
+      </div>
+      <button class="btn btn-accent" onclick="openNewTicket()">+ Novo Ticket</button>
+      <button class="btn btn-ghost" onclick="logout()">Sair</button>
+    </div>
+  </header>
+
+  <div class="nav-tabs" id="navTabs">
+    <button class="nav-tab active" onclick="showTab('board')">🗂 Quadro</button>
+    <button class="nav-tab" onclick="showTab('rel')">📊 Relatórios</button>
+    <button class="nav-tab admin-only" onclick="showTab('tags')" style="display:none">🏷 Tags</button>
+    <button class="nav-tab admin-only" onclick="showTab('arquivo')" style="display:none">🗃 Arquivo</button>
+  </div>
+
+  <!-- Barra de contexto para usuários vendas -->
+  <div id="visibilityBar" style="display:none;align-items:center;gap:10px;padding:9px 28px;background:rgba(91,138,255,.07);border-bottom:1px solid rgba(91,138,255,.15);font-size:.82rem;color:var(--t2);">
+    <span>👁</span>
+    <span>Você está vendo apenas os tickets onde você é <strong style="color:var(--accent)">participante ou criador</strong>. Peça a um colega para te incluir nos demais.</span>
+  </div>
+
+  <!-- BOARD -->
+  <div id="boardTab">
+    <div class="stats-row" id="statsRow"></div>
+    <div class="toolbar">
+      <div class="toolbar-left">Tickets Ativos</div>
+      <div class="toolbar-right">
+        <div class="search"><span style="color:var(--t3)">🔍</span><input type="text" id="srch" placeholder="Buscar ticket..." oninput="renderBoard()"></div>
+        <select class="fselect" id="fUrg" onchange="renderBoard()"><option value="">Todas urgências</option><option value="red">🔴 Extrema</option><option value="yellow">🟡 Média</option><option value="green">🟢 Baixa</option></select>
+        <select class="fselect" id="fTag" onchange="renderBoard()"><option value="">Todas as tags</option></select>
+        <select class="fselect" id="fUser" onchange="renderBoard()"><option value="">Todos usuários</option></select>
+      </div>
+    </div>
+    <div class="board-wrap"><div class="board" id="board"></div></div>
+  </div>
+
+  <!-- RELATÓRIOS -->
+  <div id="relTab" style="display:none">
+    <div class="rel-controls">
+      <div class="rel-title" style="margin:0">📊 Relatórios</div>
+      <select class="fselect" id="relTag"><option value="">Todas as tags</option></select>
+      <select class="fselect" id="relUser"><option value="">Todos usuários</option></select>
+      <select class="fselect" id="relUrg"><option value="">Todas urgências</option><option value="red">🔴 Extrema</option><option value="yellow">🟡 Média</option><option value="green">🟢 Baixa</option></select>
+      <select class="fselect" id="relStatus"><option value="">Todos status</option><option value="aberto">Aberto</option><option value="em-andamento">Em Andamento</option><option value="aguardando">Aguardando</option><option value="finalizado">Finalizado</option></select>
+      <button class="btn btn-accent" onclick="printRel()">🖨 Imprimir</button>
+    </div>
+    <div id="relContent"></div>
+  </div>
+
+  <!-- TAGS (admin) -->
+  <div id="tagsTab" style="display:none">
+    <div class="tag-mgr">
+      <h2>🏷 Gerenciar Tags</h2>
+      <div class="tag-list-admin" id="tagListAdmin"></div>
+      <div class="sep"></div>
+      <h2 style="margin-bottom:14px">Nova Tag</h2>
+      <div class="tag-new-form">
+        <div style="flex:1">
+          <input type="text" id="newTagName" placeholder="Nome da tag (ex: Refração)">
+          <div class="color-picker-wrap" id="colorPicker"></div>
+        </div>
+        <button class="btn btn-accent" style="height:38px" onclick="createTag()">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARQUIVO (admin) -->
+  <div id="arquivoTab" style="display:none">
+    <div style="margin-bottom:20px">
+      <div class="rel-title">🗃 Arquivo — Tickets Finalizados / Excluídos</div>
+      <p style="color:var(--t2);font-size:.85rem;margin-top:4px">Visível apenas para admins.</p>
+    </div>
+    <div id="arquivoContent"></div>
+  </div>
+</div>
+
+<!-- ══ MODAL TICKET ══ -->
+<div class="overlay" id="ticketOverlay">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div>
+        <h2 id="mTitle">Novo Ticket</h2>
+        <div class="sub" id="mSub"></div>
+      </div>
+      <button class="mcl" onclick="closeOverlay('ticketOverlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Assunto *</label><input type="text" id="fAssunto" placeholder="Descreva o assunto do ticket"></div>
+      <div class="frow">
+        <div class="field"><label>Responsável</label><input type="text" id="fResp" placeholder="Nome"></div>
+        <div class="field val-input"><label>Valor do Serviço</label><input type="number" id="fValor" placeholder="0,00" step="0.01" min="0"></div>
+      </div>
+      <div class="field"><label>Urgência</label>
+        <div class="urg-picker">
+          <button class="urg-btn u-green" onclick="setUrg('green',this)">🟢 Baixa</button>
+          <button class="urg-btn u-yellow sel" onclick="setUrg('yellow',this)">🟡 Média</button>
+          <button class="urg-btn u-red" onclick="setUrg('red',this)">🔴 Extrema</button>
+        </div>
+      </div>
+      <div class="field"><label>Tags</label><div class="tags-wrap" id="tagsWrap"></div></div>
+      <div class="field"><label>Participantes</label><div class="parts-wrap" id="partsWrap"></div></div>
+      <div class="field"><label>Descrição / Observações</label><textarea id="fDesc" rows="3" placeholder="Detalhes, contexto, observações..."></textarea></div>
+      <div class="field"><label>Anexar Imagens</label>
+        <div class="img-upload" onclick="document.getElementById('imgInput').click()">
+          📎 Clique para anexar imagens
+          <input type="file" id="imgInput" accept="image/*" multiple onchange="handleImgs(this)">
+        </div>
+        <div class="img-preview" id="imgPreview"></div>
+      </div>
+
+      <!-- COMENTÁRIOS (só aparecem ao editar) -->
+      <div class="comments" id="commentsSection" style="display:none">
+        <div class="sep"></div>
+        <h3>💬 Conversa do Ticket</h3>
+        <div class="comment-list" id="commentList"></div>
+        <div class="cmt-input-area">
+          <textarea id="cmtText" rows="2" placeholder="Escreva uma mensagem para a equipe..."></textarea>
+          <div class="cmt-bottom">
+            <label class="cmt-attach">📎 Imagem
+              <input type="file" accept="image/*" id="cmtImg" onchange="previewCmtImg(this)">
+            </label>
+            <div id="cmtImgPreview" style="font-size:.78rem;color:var(--t2)"></div>
+            <button class="btn btn-accent" onclick="addComment()">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <div style="display:flex;gap:8px" id="adminActions"></div>
+      <div class="modal-ftr-right">
+        <button class="btn btn-ghost" onclick="closeOverlay('ticketOverlay')">Cancelar</button>
+        <button class="btn btn-accent" onclick="saveTicket()" id="btnSave">Salvar Ticket</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PRINT AREA ══ -->
+<div id="printArea"></div>
+
+<div class="notif" id="notif"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  ⚠️  COLE AQUI A URL DO SEU APPS SCRIPT (Passo 3 do tutorial)
+// ═══════════════════════════════════════════════════════════════
+const API = 'https://script.google.com/macros/s/AKfycby3EY-mk4FmQZxi3AYUj_pbUPjzDNonrIZPt4aeGttRJYDhpNKT57qfbziptX8Jc2Q/exec';
+// ═══════════════════════════════════════════════════════════════
+
+const USERS = {
+  Bruno:     {role:'admin', pass:'admin123'},
+  Rodrigo:   {role:'admin', pass:'admin123'},
+  Junior:    {role:'admin', pass:'admin123'},
+  Denis:     {role:'vendas',pass:'vendas123'},
+  Reginaldo: {role:'vendas',pass:'vendas123'},
+  Anderson:  {role:'vendas',pass:'vendas123'},
+  Anne:      {role:'vendas',pass:'vendas123'},
+  Lex:       {role:'vendas',pass:'vendas123'},
+  Emerson:   {role:'vendas',pass:'vendas123'},
+  Cassia:    {role:'vendas',pass:'vendas123'},
+  Anna:      {role:'vendas',pass:'vendas123'},
+};
+
+const COLS = [
+  {id:'aberto',       label:'Aberto',       color:'#8899c0'},
+  {id:'em-andamento', label:'Em Andamento', color:'#5b8aff'},
+  {id:'aguardando',   label:'Aguardando',   color:'#f5b731'},
+  {id:'finalizado',   label:'Finalizado',   color:'#1fd080'},
+];
+
+const TAG_COLORS = ['#5b8aff','#8b5bff','#1fd080','#f5b731','#ff4a6b','#ff8c42','#00bcd4','#e91e63'];
+let selTagColor  = TAG_COLORS[0];
+
+// Estado global
+let me           = null;
+let tickets      = [];
+let tags         = [];
+let editId       = null;
+let selUrg       = 'yellow';
+let selParts     = [];
+let selTags      = [];
+let uploadedImgs = [];
+let cmtImgData   = null;
+let dragId       = null;
+
+// ═══════════════════════════════════════════════════════════════
+//  API
+// ═══════════════════════════════════════════════════════════════
+async function callAPI(params) {
+  if (API === 'https://script.google.com/macros/s/AKfycby3EY-mk4FmQZxi3AYUj_pbUPjzDNonrIZPt4aeGttRJYDhpNKT57qfbziptX8Jc2Q/exec') {
+    notify('⚠️ Configure a URL do Apps Script no arquivo HTML!','err');
+    throw new Error('API não configurada');
+  }
+  try {
+    const res = await fetch(API + '?action=' + params.action + '&t=' + Date.now(), {
+      method: 'POST',
+      redirect: 'follow',
+      body:   JSON.stringify(params),
+    });
+    return await res.json();
+  } catch(e) {
+    notify('Erro de conexão com o servidor.', 'err');
+    throw e;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════════════════
+function doLogin() {
+  const name = document.getElementById('loginUser').value;
+  const pass = document.getElementById('loginPass').value;
+  const err  = document.getElementById('loginErr');
+  if (!name) { err.textContent='Selecione seu nome.'; err.style.display='block'; return; }
+  if (!pass) { err.textContent='Digite sua senha.';   err.style.display='block'; return; }
+  const u = USERS[name];
+  if (!u || u.pass !== pass) { err.textContent='Senha incorreta.'; err.style.display='block'; return; }
+  me = {name, role: u.role};
+  sessionStorage.setItem('tf_me', JSON.stringify(me));
+  err.style.display = 'none';
+  initApp();
+}
+
+function logout() {
+  me = null;
+  sessionStorage.removeItem('tf_me');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginPass').value = '';
+}
+
+const isAdmin = () => me && me.role === 'admin';
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+async function initApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('hdrName').textContent = me.name;
+  const b = document.getElementById('hdrBadge');
+  b.textContent = isAdmin() ? 'Admin' : 'Vendas';
+  b.className   = 'badge ' + (isAdmin() ? 'badge-admin' : 'badge-vendas');
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin() ? '' : 'none');
+  const vbar = document.getElementById('visibilityBar');
+  if (vbar) vbar.style.display = isAdmin() ? 'none' : 'flex';
+  buildColorPicker();
+  showLoading(true);
+  await loadAll();
+  showLoading(false);
+  setInterval(updateTimers, 60000);
+}
+
+function showLoading(on) {
+  let el = document.getElementById('globalLoader');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'globalLoader';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(11,13,18,.85);z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:Syne,sans-serif;font-size:1rem;color:#8899c0;';
+    el.innerHTML = '<div style="width:40px;height:40px;border:3px solid #2e3450;border-top-color:#5b8aff;border-radius:50%;animation:spin .7s linear infinite"></div>Carregando dados...';
+    document.body.appendChild(el);
+  }
+  el.style.display = on ? 'flex' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LOAD ALL DATA
+// ═══════════════════════════════════════════════════════════════
+async function loadAll() {
+  const r = await callAPI({action:'getAll'});
+  if (!r.ok) { notify(r.error, 'err'); return; }
+
+  // Normaliza tickets (arrays guardados como JSON string no Sheets)
+  tickets = (r.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
+  tags    = r.tags || [];
+
+  buildFilters();
+  buildColorPicker();
+  renderBoard();
+  renderTagAdmin();
+}
+
+function parseTicket(t) {
+  ['tags','participants','images'].forEach(k => {
+    if (typeof t[k] === 'string') {
+      try { t[k] = JSON.parse(t[k]); } catch { t[k] = []; }
+    }
+    if (!Array.isArray(t[k])) t[k] = [];
+  });
+  return t;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VISIBILIDADE
+// ═══════════════════════════════════════════════════════════════
+function canSee(t) {
+  if (isAdmin()) return true;
+  // não-admins só veem tickets que criaram ou participam
+  return t.createdBy === me.name || (t.participants||[]).includes(me.name);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════════════
+function showTab(tab) {
+  ['board','rel','tags','arquivo'].forEach(t => {
+    const el = document.getElementById(t==='board'?'boardTab':t+'Tab');
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-tab').forEach((el,i) => {
+    el.classList.toggle('active', ['board','rel','tags','arquivo'][i] === tab);
+  });
+  if (tab === 'rel')    renderRel();
+  if (tab === 'tags')   renderTagAdmin();
+  if (tab === 'arquivo') renderArquivo();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FILTERS
+// ═══════════════════════════════════════════════════════════════
+function buildFilters() {
+  ['fTag','relTag'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '<option value="">Todas as tags</option>' +
+      tags.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  });
+  const users = Object.keys(USERS);
+  ['fUser','relUser'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '<option value="">Todos usuários</option>' +
+      users.map(u => `<option>${u}</option>`).join('');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════════════════
+function renderStats() {
+  const visible = tickets.filter(t => t.deleted !== 'sim' && t.archived !== 'sim' && canSee(t));
+  const active  = visible.filter(t => t.status !== 'finalizado');
+  const red      = active.filter(t => t.urgency === 'red').length;
+  const total    = active.length;
+  const totalVal = visible.reduce((s,t) => s + (parseFloat(t.valor)||0), 0);
+  const arch     = tickets.filter(t => t.archived === 'sim' && t.deleted !== 'sim' && canSee(t)).length;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Tickets Ativos</div><div class="stat-value" style="color:var(--accent)">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Urgência Extrema</div><div class="stat-value" style="color:var(--red)">${red}</div></div>
+    <div class="stat-card"><div class="stat-label">Finalizados</div><div class="stat-value" style="color:var(--green)">${arch}</div></div>
+    <div class="stat-card"><div class="stat-label">Valor Total</div><div class="stat-value" style="color:var(--yellow)">R$ ${totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="stat-sub">tickets visíveis</div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOARD
+// ═══════════════════════════════════════════════════════════════
+function renderBoard() {
+  renderStats();
+  const q   = (document.getElementById('srch').value||'').toLowerCase();
+  const fu  = document.getElementById('fUrg').value;
+  const ft  = document.getElementById('fTag').value;
+  const fus = document.getElementById('fUser').value;
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  COLS.forEach(col => {
+    let cv = tickets.filter(t =>
+      t.status === col.id && t.deleted !== 'sim' && t.archived !== 'sim' && canSee(t)
+    );
+    if (q)   cv = cv.filter(t => (t.assunto||'').toLowerCase().includes(q) || (t.resp||'').toLowerCase().includes(q));
+    if (fu)  cv = cv.filter(t => t.urgency === fu);
+    if (ft)  cv = cv.filter(t => (t.tags||[]).includes(ft));
+    if (fus) cv = cv.filter(t => (t.participants||[]).includes(fus) || t.createdBy === fus);
+
+    const div = document.createElement('div');
+    div.className = 'col';
+    div.innerHTML = `
+      <div class="col-hdr">
+        <div class="col-title"><span class="col-pip" style="background:${col.color}"></span>${col.label}</div>
+        <span class="col-n">${cv.length}</span>
+      </div>
+      <div class="col-body" id="cb-${col.id}"
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="dropTicket(event,'${col.id}')">
+        ${cv.length ? cv.map(ticketCardHTML).join('') : '<div class="empty">Nenhum ticket</div>'}
+      </div>
+      <button class="add-ticket" onclick="openNewTicket('${col.id}')">＋ Novo ticket aqui</button>`;
+    board.appendChild(div);
+  });
+
+  document.querySelectorAll('.tcard').forEach(el => {
+    el.addEventListener('dragstart', e => { dragId = el.dataset.id; el.classList.add('dragging'); });
+    el.addEventListener('dragend',   e => { el.classList.remove('dragging'); });
+  });
+}
+
+function ticketCardHTML(t) {
+  const tagObjs = (t.tags||[]).map(tid => tags.find(x => x.id === tid)).filter(Boolean);
+  const age     = ticketAge(t.createdAt);
+  return `<div class="tcard urg-${t.urgency||'yellow'}" draggable="true" data-id="${t.id}" onclick="openTicket('${t.id}')">
+    <div class="tc-top">
+      <div class="tc-title">${t.assunto||''}</div>
+      <div class="urg-dot" style="background:${urgColor(t.urgency)}" title="${urgLabel(t.urgency)}"></div>
+    </div>
+    <div class="tc-id">#${String(t.id).slice(-6).toUpperCase()} · ${t.createdBy||''}</div>
+    <div class="tc-tags">${tagObjs.map(tg=>`<span class="tag" style="background:${tg.color}22;color:${tg.color};border-color:${tg.color}44">${tg.name}</span>`).join('')}</div>
+    <div class="tc-meta">
+      ${t.resp  ? `<span>👤 ${t.resp}</span>`:''}
+      ${t.valor ? `<span>💰 R$ ${parseFloat(t.valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`:''}
+      <span>👥 ${(t.participants||[]).length}</span>
+    </div>
+    <div class="tc-footer">
+      <span class="timer ${age.days>=1?'hot':''}" id="timer-${t.id}">${age.label}</span>
+      <span style="font-size:.73rem;color:var(--t3)">💬</span>
+    </div>
+  </div>`;
+}
+
+function urgColor(u){return u==='red'?'var(--red)':u==='green'?'var(--green)':'var(--yellow)';}
+function urgLabel(u){return u==='red'?'Extrema Urgência':u==='green'?'Baixa Urgência':'Urgência Média';}
+
+function ticketAge(ts) {
+  if (!ts) return {days:0, label:'novo'};
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff/60000);
+  const hrs  = Math.floor(mins/60);
+  const days = Math.floor(hrs/24);
+  if (days > 0) return {days, label:`${days}d ${hrs%24}h`};
+  if (hrs  > 0) return {days:0, label:`${hrs}h ${mins%60}m`};
+  return {days:0, label:`${mins}m`};
+}
+
+function updateTimers() {
+  tickets.forEach(t => {
+    const el = document.getElementById('timer-'+t.id);
+    if (el) {
+      const age = ticketAge(t.createdAt);
+      el.textContent = age.label;
+      el.className   = 'timer' + (age.days>=1?' hot':'');
+    }
+  });
+}
+
+// ── DRAG & DROP ──────────────────────────────────────────────────
+async function dropTicket(e, colId) {
+  e.preventDefault();
+  document.getElementById('cb-'+colId).classList.remove('dragover');
+  if (!dragId) return;
+  const t = tickets.find(x => x.id === dragId);
+  if (!t || t.status === colId) return;
+  if (colId === 'finalizado' && !isAdmin()) {
+    notify('Apenas admins podem finalizar tickets.','err'); return;
+  }
+  // Otimista: atualiza UI primeiro
+  t.status = colId;
+  renderBoard();
+
+  if (colId === 'finalizado') {
+    t.archived = 'sim';
+    const r = await callAPI({action:'archiveTicket', id:dragId});
+    if (!r.ok) { notify(r.error,'err'); await loadAll(); return; }
+    tickets = tickets.filter(x => x.id !== dragId);
+  } else {
+    const r = await callAPI({action:'moveTicket', id:dragId, status:colId});
+    if (!r.ok) { notify(r.error,'err'); await loadAll(); return; }
+  }
+  renderBoard();
+  notify('Ticket movido para '+COLS.find(c=>c.id===colId).label);
+  dragId = null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MODAL TICKET
+// ═══════════════════════════════════════════════════════════════
+function openNewTicket(colId='aberto') {
+  editId = null; selUrg='yellow'; selParts=[me.name]; selTags=[]; uploadedImgs=[];
+  document.getElementById('mTitle').textContent = 'Novo Ticket';
+  document.getElementById('mSub').textContent   = '';
+  ['fAssunto','fResp','fValor','fDesc'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('imgPreview').innerHTML = '';
+  document.getElementById('commentsSection').style.display = 'none';
+  document.getElementById('adminActions').innerHTML = '';
+  document.getElementById('fAssunto').dataset.col = colId;
+  buildUrgPicker(); buildPartsPicker(); buildTagsPicker();
+  openOverlay('ticketOverlay');
+  setTimeout(() => document.getElementById('fAssunto').focus(), 100);
+}
+
+async function openTicket(id) {
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  editId       = id;
+  selUrg       = t.urgency || 'yellow';
+  selParts     = [...(t.participants||[])];
+  selTags      = [...(t.tags||[])];
+  uploadedImgs = [...(t.images||[])];
+
+  document.getElementById('mTitle').textContent = 'Ticket #' + String(id).slice(-6).toUpperCase();
+  document.getElementById('mSub').textContent   = `Aberto por ${t.createdBy} · ${ticketAge(t.createdAt).label} atrás`;
+  document.getElementById('fAssunto').value = t.assunto || '';
+  document.getElementById('fResp').value    = t.resp    || '';
+  document.getElementById('fValor').value   = t.valor   || '';
+  document.getElementById('fDesc').value    = t.desc    || '';
+  buildUrgPicker(); buildPartsPicker(); buildTagsPicker(); renderImgPreview();
+  document.getElementById('commentsSection').style.display = '';
+  document.getElementById('commentList').innerHTML = '<div style="color:var(--t3);font-size:.82rem">Carregando...</div>';
+
+  const aa = document.getElementById('adminActions');
+  aa.innerHTML = isAdmin() ? `
+    <button class="btn btn-green"  onclick="finalizeTicket('${id}')">✔ Finalizar</button>
+    <button class="btn btn-danger" onclick="deleteTicket('${id}')">🗑 Excluir</button>` : '';
+
+  openOverlay('ticketOverlay');
+
+  // Carrega comentários
+  const r = await callAPI({action:'getComments', ticketId:id});
+  if (r.ok) renderComments(r.comments);
+}
+
+// ── URGÊNCIA ─────────────────────────────────────────────────────
+function buildUrgPicker() {
+  document.querySelectorAll('.urg-btn').forEach(btn => {
+    const u = btn.classList.contains('u-red')?'red':btn.classList.contains('u-green')?'green':'yellow';
+    btn.classList.toggle('sel', u === selUrg);
+  });
+}
+function setUrg(u, btn) {
+  selUrg = u;
+  document.querySelectorAll('.urg-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+// ── PARTICIPANTES ────────────────────────────────────────────────
+function buildPartsPicker() {
+  document.getElementById('partsWrap').innerHTML = Object.keys(USERS).map(u =>
+    `<div class="part-chip ${selParts.includes(u)?'sel':''}" onclick="togglePart('${u}',this)">${u}</div>`
+  ).join('');
+}
+function togglePart(name, el) {
+  selParts = selParts.includes(name) ? selParts.filter(x=>x!==name) : [...selParts, name];
+  el.classList.toggle('sel', selParts.includes(name));
+}
+
+// ── TAGS PICKER ──────────────────────────────────────────────────
+function buildTagsPicker() {
+  const wrap = document.getElementById('tagsWrap');
+  if (!tags.length) {
+    wrap.innerHTML = '<span style="color:var(--t3);font-size:.82rem">Nenhuma tag criada. Admins podem criar na aba Tags.</span>';
+    return;
+  }
+  wrap.innerHTML = tags.map(t =>
+    `<div class="tag-chip ${selTags.includes(t.id)?'sel':''}" style="background:${t.color}22;color:${t.color};border-color:${t.color}${selTags.includes(t.id)?'':'44'}" onclick="toggleTag('${t.id}',this)">${t.name}</div>`
+  ).join('');
+}
+function toggleTag(id, el) {
+  selTags = selTags.includes(id) ? selTags.filter(x=>x!==id) : [...selTags, id];
+  el.classList.toggle('sel', selTags.includes(id));
+  el.style.opacity = selTags.includes(id) ? '1' : '0.5';
+}
+
+// ── IMAGENS ──────────────────────────────────────────────────────
+function handleImgs(inp) {
+  Array.from(inp.files).forEach(f => {
+    const r = new FileReader();
+    r.onload = e => { uploadedImgs.push(e.target.result); renderImgPreview(); };
+    r.readAsDataURL(f);
+  });
+  inp.value = '';
+}
+function renderImgPreview() {
+  document.getElementById('imgPreview').innerHTML = uploadedImgs.map((src,i) =>
+    `<div class="img-thumb"><img src="${src}"><button class="img-del" onclick="removeImg(${i})">✕</button></div>`
+  ).join('');
+}
+function removeImg(i) { uploadedImgs.splice(i,1); renderImgPreview(); }
+
+// ── COMENTÁRIOS ──────────────────────────────────────────────────
+function renderComments(coms) {
+  const list = document.getElementById('commentList');
+  if (!coms || !coms.length) {
+    list.innerHTML = '<div style="color:var(--t3);font-size:.82rem;padding:4px 0">Nenhuma mensagem ainda.</div>';
+    return;
+  }
+  list.innerHTML = coms.map(c => `
+    <div class="comment">
+      <div class="comment-hdr">
+        <span class="comment-author">👤 ${c.author}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="comment-date">${c.date}</span>
+          <button class="cmt-del" onclick="delComment('${c.id}')" ${isAdmin()?'':'disabled'}>${isAdmin()?'✕':'🔒'}</button>
+        </div>
+      </div>
+      <div class="comment-text">${c.text||''}</div>
+      ${c.img ? `<div class="comment-img"><img src="${c.img}"></div>` : ''}
+    </div>`).join('');
+}
+
+function previewCmtImg(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => { cmtImgData = e.target.result; document.getElementById('cmtImgPreview').textContent = '📎 '+f.name; };
+  r.readAsDataURL(f);
+}
+
+async function addComment() {
+  const txt = document.getElementById('cmtText').value.trim();
+  if (!txt && !cmtImgData) return;
+  if (!editId) return;
+  const btn = document.querySelector('#commentsSection .btn-accent');
+  btn.innerHTML = '<span class="loader"></span>'; btn.disabled = true;
+
+  const r = await callAPI({action:'addComment', ticketId:editId, author:me.name, text:txt, img:cmtImgData||''});
+  btn.innerHTML = 'Enviar'; btn.disabled = false;
+  if (!r.ok) { notify(r.error,'err'); return; }
+  cmtImgData = null;
+  document.getElementById('cmtText').value = '';
+  document.getElementById('cmtImgPreview').textContent = '';
+  document.getElementById('cmtImg').value = '';
+
+  // Recarrega comentários
+  const r2 = await callAPI({action:'getComments', ticketId:editId});
+  if (r2.ok) renderComments(r2.comments);
+  notify('Mensagem enviada!');
+}
+
+async function delComment(id) {
+  if (!isAdmin()) return;
+  const r = await callAPI({action:'delComment', id});
+  if (!r.ok) { notify(r.error,'err'); return; }
+  const r2 = await callAPI({action:'getComments', ticketId:editId});
+  if (r2.ok) renderComments(r2.comments);
+  notify('Mensagem excluída.');
+}
+
+// ── SALVAR TICKET ────────────────────────────────────────────────
+async function saveTicket() {
+  const assunto = document.getElementById('fAssunto').value.trim();
+  if (!assunto) { document.getElementById('fAssunto').style.borderColor='var(--red)'; document.getElementById('fAssunto').focus(); return; }
+  document.getElementById('fAssunto').style.borderColor = '';
+  const btn = document.getElementById('btnSave');
+  btn.innerHTML = '<span class="loader"></span>'; btn.disabled = true;
+
+  const ticketData = {
+    id:           editId || null,
+    assunto,
+    resp:         document.getElementById('fResp').value,
+    valor:        document.getElementById('fValor').value,
+    desc:         document.getElementById('fDesc').value,
+    urgency:      selUrg,
+    tags:         selTags,
+    participants: selParts,
+    images:       uploadedImgs,
+    status:       editId ? (tickets.find(t=>t.id===editId)||{}).status : (document.getElementById('fAssunto').dataset.col||'aberto'),
+    createdBy:    editId ? undefined : me.name,
+  };
+
+  const r = await callAPI({action:'saveTicket', ticket:ticketData});
+  btn.innerHTML = 'Salvar Ticket'; btn.disabled = false;
+  if (!r.ok) { notify(r.error,'err'); return; }
+
+  closeOverlay('ticketOverlay');
+  await loadAll();
+  notify(editId ? 'Ticket atualizado!' : 'Ticket criado!');
+}
+
+// ── FINALIZAR / EXCLUIR ──────────────────────────────────────────
+async function finalizeTicket(id) {
+  if (!isAdmin()) return notify('Apenas admins podem finalizar.','err');
+  if (!confirm('Finalizar este ticket? Ele irá para o arquivo.')) return;
+  const r = await callAPI({action:'archiveTicket', id});
+  if (!r.ok) { notify(r.error,'err'); return; }
+  closeOverlay('ticketOverlay');
+  await loadAll();
+  notify('Ticket finalizado e arquivado.');
+}
+
+async function deleteTicket(id) {
+  if (!isAdmin()) return notify('Apenas admins podem excluir.','err');
+  if (!confirm('Excluir este ticket? Ele irá para o arquivo.')) return;
+  const r = await callAPI({action:'deleteTicket', id, deletedBy:me.name});
+  if (!r.ok) { notify(r.error,'err'); return; }
+  closeOverlay('ticketOverlay');
+  await loadAll();
+  notify('Ticket excluído e movido para o arquivo.');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RELATÓRIOS
+// ═══════════════════════════════════════════════════════════════
+function renderRel() {
+  const rt  = document.getElementById('relTag').value;
+  const ru  = document.getElementById('relUser').value;
+  const rurg= document.getElementById('relUrg').value;
+  const rs  = document.getElementById('relStatus').value;
+
+  let all = tickets.filter(t => canSee(t));
+  if (rt)  all = all.filter(t => (t.tags||[]).includes(rt));
+  if (ru)  all = all.filter(t => (t.participants||[]).includes(ru) || t.createdBy===ru);
+  if (rurg)all = all.filter(t => t.urgency===rurg);
+  if (rs)  all = all.filter(t => t.status===rs);
+
+  const totalVal = all.reduce((s,t) => s+(parseFloat(t.valor)||0), 0);
+  const withVal  = all.filter(t => parseFloat(t.valor)>0);
+  const urgMap   = {red:'🔴 Extrema',yellow:'🟡 Média',green:'🟢 Baixa'};
+  const colMap   = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
+
+  document.getElementById('relContent').innerHTML = `
+    <table class="rel-table">
+      <thead><tr><th>#</th><th>Assunto</th><th>Criado por</th><th>Status</th><th>Urgência</th><th>Tags</th><th>Valor</th><th>Abertura</th></tr></thead>
+      <tbody>${all.map(t => {
+        const tagNames = (t.tags||[]).map(tid => { const tg=tags.find(x=>x.id===tid); return tg?`<span class="tag" style="background:${tg.color}22;color:${tg.color};border-color:${tg.color}44">${tg.name}</span>`:''; }).join(' ');
+        const val = parseFloat(t.valor)||0;
+        const dt  = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : '—';
+        return `<tr>
+          <td style="color:var(--t2);font-size:.75rem">#${String(t.id).slice(-6).toUpperCase()}</td>
+          <td><strong>${t.assunto||''}</strong>${t.deleted==='sim'?'<span class="chip" style="margin-left:6px;color:var(--red)">excluído</span>':t.archived==='sim'?'<span class="chip" style="margin-left:6px">finalizado</span>':''}</td>
+          <td>${t.createdBy||''}</td>
+          <td>${colMap[t.status]||t.status||''}</td>
+          <td>${urgMap[t.urgency]||''}</td>
+          <td>${tagNames||'—'}</td>
+          <td>${val>0?'R$ '+val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
+          <td>${dt}</td>
+        </tr>`;}).join('')}
+      </tbody>
+    </table>
+    <div class="rel-sum">
+      <div class="rel-sum-item"><div class="lbl">Total de tickets</div><div class="val">${all.length}</div></div>
+      <div class="rel-sum-item"><div class="lbl">Com valor</div><div class="val">${withVal.length}</div></div>
+      <div class="rel-sum-item"><div class="lbl">Soma total</div><div class="val" style="color:var(--yellow)">R$ ${totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>
+    </div>`;
+}
+
+function printRel() {
+  const rt  = document.getElementById('relTag').value;
+  const ru  = document.getElementById('relUser').value;
+  const rurg= document.getElementById('relUrg').value;
+  const rs  = document.getElementById('relStatus').value;
+  let all = tickets.filter(t => canSee(t));
+  if (rt)  all = all.filter(t=>(t.tags||[]).includes(rt));
+  if (ru)  all = all.filter(t=>(t.participants||[]).includes(ru)||t.createdBy===ru);
+  if (rurg)all = all.filter(t=>t.urgency===rurg);
+  if (rs)  all = all.filter(t=>t.status===rs);
+
+  const totalVal = all.reduce((s,t)=>s+(parseFloat(t.valor)||0),0);
+  const urgMap   = {red:'Extrema',yellow:'Média',green:'Baixa'};
+  const colMap   = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório TicketFlow</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px;}h1{font-size:18px;margin-bottom:4px;}.sub{color:#666;font-size:11px;margin-bottom:20px;}table{width:100%;border-collapse:collapse;}th{background:#f0f0f0;padding:7px 10px;text-align:left;border:1px solid #ddd;font-size:11px;}td{padding:7px 10px;border:1px solid #ddd;}.sum{margin-top:20px;padding:12px;background:#f9f9f9;border:1px solid #ddd;display:flex;gap:32px;}.sum-item .lbl{font-size:10px;color:#666;text-transform:uppercase;}.sum-item .val{font-size:16px;font-weight:700;margin-top:2px;}</style></head><body>
+    <h1>📋 Relatório TicketFlow</h1>
+    <div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')} por ${me.name}</div>
+    <table><thead><tr><th>#</th><th>Assunto</th><th>Criado por</th><th>Status</th><th>Urgência</th><th>Tags</th><th>Valor</th><th>Abertura</th></tr></thead>
+    <tbody>${all.map(t=>{const tagN=(t.tags||[]).map(tid=>tags.find(x=>x.id===tid)?.name||'').filter(Boolean).join(', ');const val=parseFloat(t.valor)||0;const dt=t.createdAt?new Date(t.createdAt).toLocaleDateString('pt-BR'):'—';return`<tr><td>#${String(t.id).slice(-6).toUpperCase()}</td><td>${t.assunto||''}${t.deleted==='sim'?' [EXCLUÍDO]':t.archived==='sim'?' [FINALIZADO]':''}</td><td>${t.createdBy||''}</td><td>${colMap[t.status]||''}</td><td>${urgMap[t.urgency]||''}</td><td>${tagN||'—'}</td><td>${val>0?'R$ '+val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td><td>${dt}</td></tr>`;}).join('')}
+    </tbody></table>
+    <div class="sum"><div class="sum-item"><div class="lbl">Total</div><div class="val">${all.length}</div></div><div class="sum-item"><div class="lbl">Soma total</div><div class="val">R$ ${totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div></div>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TAGS (admin)
+// ═══════════════════════════════════════════════════════════════
+function buildColorPicker() {
+  const wrap = document.getElementById('colorPicker');
+  if (!wrap) return;
+  wrap.innerHTML = TAG_COLORS.map(c =>
+    `<div class="color-opt ${c===selTagColor?'sel':''}" style="background:${c}" onclick="selectColor('${c}',this)"></div>`
+  ).join('');
+}
+function selectColor(c, el) {
+  selTagColor = c;
+  document.querySelectorAll('.color-opt').forEach(x => x.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+async function createTag() {
+  const name = document.getElementById('newTagName').value.trim();
+  if (!name) return notify('Digite um nome para a tag.','warn');
+  const r = await callAPI({action:'saveTag', name, color:selTagColor});
+  if (!r.ok) { notify(r.error,'err'); return; }
+  document.getElementById('newTagName').value = '';
+  await loadAll();
+  renderTagAdmin();
+  notify('Tag criada!');
+}
+
+async function deleteTag(id) {
+  if (!confirm('Excluir esta tag?')) return;
+  const r = await callAPI({action:'deleteTag', id});
+  if (!r.ok) { notify(r.error,'err'); return; }
+  await loadAll();
+  renderTagAdmin();
+  notify('Tag excluída.');
+}
+
+function renderTagAdmin() {
+  const list = document.getElementById('tagListAdmin');
+  if (!list) return;
+  if (!tags.length) { list.innerHTML='<div style="color:var(--t3);font-size:.85rem">Nenhuma tag criada.</div>'; return; }
+  list.innerHTML = tags.map(t => `
+    <div class="tag-row">
+      <div class="tag-row-left">
+        <div class="color-dot" style="background:${t.color}"></div>
+        <span class="tag" style="background:${t.color}22;color:${t.color};border-color:${t.color}44">${t.name}</span>
+      </div>
+      <button class="btn btn-danger" style="padding:4px 10px;font-size:.76rem" onclick="deleteTag('${t.id}')">Excluir</button>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ARQUIVO (admin)
+// ═══════════════════════════════════════════════════════════════
+function renderArquivo() {
+  const all = tickets.filter(t => t.archived === 'sim');
+  const el  = document.getElementById('arquivoContent');
+  if (!all.length) { el.innerHTML='<div style="color:var(--t2)">Nenhum ticket arquivado ainda.</div>'; return; }
+  const urgMap = {red:'🔴',yellow:'🟡',green:'🟢'};
+  el.innerHTML = `<table class="rel-table">
+    <thead><tr><th>#</th><th>Assunto</th><th>Status</th><th>Urgência</th><th>Criado por</th><th>Valor</th><th>Situação</th></tr></thead>
+    <tbody>${all.map(t => {
+      const val = parseFloat(t.valor)||0;
+      return `<tr>
+        <td style="color:var(--t2);font-size:.75rem">#${String(t.id).slice(-6).toUpperCase()}</td>
+        <td><strong>${t.assunto||''}</strong></td>
+        <td>${t.deleted==='sim'?'<span style="color:var(--red)">Excluído</span>':'<span style="color:var(--green)">Finalizado</span>'}</td>
+        <td>${urgMap[t.urgency]||''}</td>
+        <td>${t.createdBy||''}</td>
+        <td>${val>0?'R$ '+val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
+        <td style="font-size:.75rem;color:var(--t2)">${t.deleted==='sim'?`Excluído por ${t.deletedBy||'?'}`:'Finalizado'}</td>
+      </tr>`;}).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════════
+function openOverlay(id)  { document.getElementById(id).classList.add('open'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+
+function notify(msg, type) {
+  const n = document.getElementById('notif');
+  n.textContent  = (type==='err'?'✗ ':type==='warn'?'⚠ ':'✓ ') + msg;
+  n.className    = 'notif' + (type?' '+type:'');
+  n.style.display = 'block';
+  clearTimeout(n._t);
+  n._t = setTimeout(() => n.style.display='none', 3500);
+}
+
+document.querySelectorAll('.overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target===el) closeOverlay(el.id); });
+});
+
+// ─── INIT ────────────────────────────────────────────────────────
+const savedMe = sessionStorage.getItem('tf_me');
+if (savedMe) { me = JSON.parse(savedMe); initApp(); }
+</script>
+</body>
+</html>

@@ -138,6 +138,18 @@ header{
 .timer{font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;padding:3px 10px;border-radius:20px;background:var(--s3);color:var(--t2);}
 .timer.hot{color:var(--red);background:rgba(255,74,107,.12);}
 .tc-parts{font-size:.73rem;color:var(--t3);}
+@keyframes pulse-orange {
+  0%,100%{box-shadow:0 0 0 0 rgba(255,140,66,.5);}
+  50%{box-shadow:0 0 0 8px rgba(255,140,66,0);}
+}
+@keyframes pulse-card {
+  0%,100%{box-shadow:0 0 0 0 rgba(255,140,66,.6),0 2px 8px rgba(0,0,0,.18);}
+  50%{box-shadow:0 0 0 6px rgba(255,140,66,0),0 2px 8px rgba(0,0,0,.18);}
+}
+.tcard-compra {
+  border:2px solid #ff8c42!important;
+  animation: pulse-card 1.5s ease-in-out infinite;
+}
 .add-ticket{
   display:flex;align-items:center;gap:8px;padding:11px 14px;
   background:transparent;border:1px dashed var(--border);border-radius:var(--r);
@@ -330,6 +342,7 @@ header{
         <span id="hdrName"></span>
         <span class="badge" id="hdrBadge"></span>
       </div>
+      <button class="btn" style="background:#ff8c42;color:#fff;border:none;font-weight:700;animation:pulse-orange 1.5s ease-in-out infinite" onclick="openCompraTicket()">🛒 Pedido de Compras</button>
       <button class="btn btn-accent" onclick="openNewTicket()">+ Novo Ticket</button>
       <button class="btn btn-ghost" onclick="logout()">Sair</button>
     </div>
@@ -455,6 +468,16 @@ header{
         <div class="field"><label>Responsável</label><input type="text" id="fResp" placeholder="Nome"></div>
         <div class="field val-input"><label>Valor do Serviço</label><input type="number" id="fValor" placeholder="0,00" step="0.01" min="0"></div>
       </div>
+      <div class="frow">
+        <div class="field"><label>Empresa / Nome do Cliente</label><input type="text" id="fEmpresa" placeholder="Ex: Ótica São Paulo"></div>
+        <div class="field"><label>Telefone</label><input type="text" id="fTelefone" placeholder="(00) 00000-0000"></div>
+      </div>
+      <div class="field"><label>Endereço</label><input type="text" id="fEndereco" placeholder="Rua, número, bairro..."></div>
+      <div class="field"><label>Pedido Ascont</label><input type="text" id="fAscont" placeholder="Número do pedido Ascont"></div>
+      <div class="frow">
+        <div class="field"><label>📅 Data da Visita</label><input type="date" id="fVisitaData"></div>
+        <div class="field"><label>🕐 Horário da Visita</label><input type="time" id="fVisitaHora"></div>
+      </div>
       <div class="field"><label>Urgência</label>
         <div class="urg-picker">
           <button class="urg-btn u-green" onclick="setUrg('green',this)">🟢 Baixa</button>
@@ -500,6 +523,36 @@ header{
   </div>
 </div>
 
+<!-- ══ MODAL COMPRAS ══ -->
+<div class="overlay" id="comprasOverlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <div>
+        <h2 style="color:#ff8c42">🛒 Pedido de Compras</h2>
+        <div class="sub">Será exibido no topo do quadro</div>
+      </div>
+      <button class="mcl" onclick="closeOverlay('comprasOverlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Descrição do Pedido *</label>
+        <textarea id="fCompraDesc" rows="5" placeholder="Descreva o que precisa ser comprado, quantidades, fornecedor preferido..."></textarea>
+      </div>
+      <div class="field">
+        <label>Solicitado por</label>
+        <input type="text" id="fCompraResp" placeholder="Nome" readonly>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <div></div>
+      <div class="modal-ftr-right">
+        <button class="btn btn-ghost" onclick="closeOverlay('comprasOverlay')">Cancelar</button>
+        <button class="btn" style="background:#ff8c42;color:#fff;border:none;font-weight:700" onclick="saveCompra()">🛒 Enviar Pedido</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ PRINT AREA ══ -->
 <div id="printArea"></div>
 
@@ -524,7 +577,11 @@ const USERS = {
   Emerson:   {role:'vendas',pass:'vendas123'},
   Cassia:    {role:'vendas',pass:'vendas123'},
   Anna:      {role:'vendas',pass:'vendas123'},
+  Alisson:   {role:'vendas',pass:'vendas123'},
+  Pardal:    {role:'vendas',pass:'vendas123'},
+  Tiago:     {role:'vendas',pass:'vendas123'},
 };
+const ADMINS = ['Bruno','Rodrigo','Junior'];
 
 const COLS = [
   {id:'aberto',       label:'Aberto',       color:'#8899c0'},
@@ -613,6 +670,12 @@ async function initApp() {
   await loadAll();
   showLoading(false);
   setInterval(updateTimers, 60000);
+  setInterval(checkVisitAlerts, 60000);
+  setTimeout(checkVisitAlerts, 3000); // check on load too
+  // Request notification permission
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 }
 
 function showLoading(on) {
@@ -748,6 +811,9 @@ function renderBoard() {
       if (col.id === 'excluido') return t.deleted === 'sim' && isAdmin();
       return t.status === col.id && t.deleted !== 'sim' && t.archived !== 'sim' && canSee(t);
     });
+    // Ordenar: compras primeiro, depois red, yellow, green
+    const urgOrder = {'compra':0,'red':1,'yellow':2,'green':3};
+    cv.sort((a,b) => (urgOrder[a.urgency]??2) - (urgOrder[b.urgency]??2));
     if (q)   cv = cv.filter(t => (t.assunto||'').toLowerCase().includes(q) || (t.resp||'').toLowerCase().includes(q));
     if (fu)  cv = cv.filter(t => t.urgency === fu);
     if (ft)  cv = cv.filter(t => (t.tags||[]).includes(ft));
@@ -779,7 +845,8 @@ function renderBoard() {
 function ticketCardHTML(t) {
   const tagObjs = (t.tags||[]).map(tid => tags.find(x => x.id === tid)).filter(Boolean);
   const age     = ticketAge(t.createdAt);
-  return `<div class="tcard urg-${t.urgency||'yellow'}" draggable="true" data-id="${t.id}" onclick="openTicket('${t.id}')">
+  const isCompra = t.urgency === 'compra';
+  return `<div class="tcard ${isCompra ? 'tcard-compra' : 'urg-'+(t.urgency||'yellow')}" draggable="true" data-id="${t.id}" onclick="openTicket('${t.id}')">
     <div class="tc-top">
       <div class="tc-title">${t.assunto||''}</div>
       <div class="urg-dot" style="background:${urgColor(t.urgency)}" title="${urgLabel(t.urgency)}"></div>
@@ -887,10 +954,10 @@ async function dropTicket(e, colId) {
 // ═══════════════════════════════════════════════════════════════
 function openNewTicket(colId='aberto') {
   colId = 'aberto'; // tickets sempre iniciam em Aberto
-  editId = null; selUrg='yellow'; selParts=[me.name]; selTags=[]; uploadedImgs=[];
+  editId = null; selUrg='yellow'; selParts=[...ADMINS, me.name].filter((v,i,a)=>a.indexOf(v)===i); selTags=[]; uploadedImgs=[];
   document.getElementById('mTitle').textContent = 'Novo Ticket';
   document.getElementById('mSub').textContent   = '';
-  ['fAssunto','fResp','fValor','fDesc'].forEach(id => document.getElementById(id).value='');
+  ['fAssunto','fResp','fValor','fDesc','fEmpresa','fTelefone','fEndereco','fAscont','fVisitaData','fVisitaHora'].forEach(id => document.getElementById(id).value='');
   document.getElementById('imgPreview').innerHTML = '';
   document.getElementById('commentsSection').style.display = 'none';
   document.getElementById('adminActions').innerHTML = '';
@@ -910,7 +977,7 @@ async function openTicket(id) {
   uploadedImgs = [...(t.images||[])];
 
   // Re-habilita campos (podem ter sido desativados pelo modo arquivo)
-  ['fAssunto','fResp','fValor','fDesc'].forEach(fid => {
+  ['fAssunto','fResp','fValor','fDesc','fEmpresa','fTelefone','fEndereco','fAscont','fVisitaData','fVisitaHora'].forEach(fid => {
     document.getElementById(fid).disabled = false;
   });
   document.querySelectorAll('.urg-btn,.part-chip,.tag-chip').forEach(el => el.style.pointerEvents='');
@@ -919,10 +986,16 @@ async function openTicket(id) {
 
   document.getElementById('mTitle').textContent = 'Ticket #' + String(id).slice(-6).toUpperCase();
   document.getElementById('mSub').textContent   = `Aberto por ${t.createdBy} · ${ticketAge(t.createdAt).label} atrás`;
-  document.getElementById('fAssunto').value = t.assunto || '';
-  document.getElementById('fResp').value    = t.resp    || '';
-  document.getElementById('fValor').value   = t.valor   || '';
-  document.getElementById('fDesc').value    = t.desc    || '';
+  document.getElementById('fAssunto').value   = t.assunto   || '';
+  document.getElementById('fResp').value      = t.resp      || '';
+  document.getElementById('fValor').value     = t.valor     || '';
+  document.getElementById('fDesc').value      = t.desc      || '';
+  document.getElementById('fEmpresa').value   = t.empresa   || '';
+  document.getElementById('fTelefone').value  = t.telefone  || '';
+  document.getElementById('fEndereco').value  = t.endereco  || '';
+  document.getElementById('fAscont').value    = t.ascont    || '';
+  document.getElementById('fVisitaData').value= t.visitaData|| '';
+  document.getElementById('fVisitaHora').value= t.visitaHora|| '';
   buildUrgPicker(); buildPartsPicker(); buildTagsPicker(); renderImgPreview();
   document.getElementById('commentsSection').style.display = '';
   document.getElementById('commentList').innerHTML = '<div style="color:var(--t3);font-size:.82rem">Carregando...</div>';
@@ -1155,6 +1228,12 @@ async function saveTicket() {
     resp:         document.getElementById('fResp').value,
     valor:        document.getElementById('fValor').value,
     desc:         document.getElementById('fDesc').value,
+    empresa:      document.getElementById('fEmpresa').value,
+    telefone:     document.getElementById('fTelefone').value,
+    endereco:     document.getElementById('fEndereco').value,
+    ascont:       document.getElementById('fAscont').value,
+    visitaData:   document.getElementById('fVisitaData').value,
+    visitaHora:   document.getElementById('fVisitaHora').value,
     urgency:      selUrg,
     tags:         selTags,
     participants: selParts,
@@ -1383,6 +1462,7 @@ async function createTag() {
 }
 
 async function deleteTag(id) {
+  if (!isAdmin()) return notify('Apenas admins podem excluir tags.','err');
   if (!confirm('Excluir esta tag?')) return;
   const r = await callAPI({action:'deleteTag', id});
   if (!r.ok) { notify(r.error,'err'); return; }
@@ -1401,7 +1481,7 @@ function renderTagAdmin() {
         <div class="color-dot" style="background:${t.color}"></div>
         <span class="tag" style="background:${t.color}22;color:${t.color};border-color:${t.color}44">${t.name}</span>
       </div>
-      <button class="btn btn-danger" style="padding:4px 10px;font-size:.76rem" onclick="deleteTag('${t.id}')">Excluir</button>
+      ${isAdmin() ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:.76rem" onclick="deleteTag('${t.id}')">Excluir</button>` : ''}
     </div>`).join('');
 }
 
@@ -1480,13 +1560,19 @@ async function openArchivedTicket(id) {
 
   document.getElementById('mTitle').textContent = 'Ticket #' + String(id).slice(-6).toUpperCase() + (t.deleted==='sim'?' [EXCLUÍDO]':' [FINALIZADO]');
   document.getElementById('mSub').textContent   = `Aberto por ${t.createdBy} · ${ticketAge(t.createdAt).label} atrás`;
-  document.getElementById('fAssunto').value = t.assunto || '';
-  document.getElementById('fResp').value    = t.resp    || '';
-  document.getElementById('fValor').value   = t.valor   || '';
-  document.getElementById('fDesc').value    = t.desc    || '';
+  document.getElementById('fAssunto').value   = t.assunto   || '';
+  document.getElementById('fResp').value      = t.resp      || '';
+  document.getElementById('fValor').value     = t.valor     || '';
+  document.getElementById('fDesc').value      = t.desc      || '';
+  document.getElementById('fEmpresa').value   = t.empresa   || '';
+  document.getElementById('fTelefone').value  = t.telefone  || '';
+  document.getElementById('fEndereco').value  = t.endereco  || '';
+  document.getElementById('fAscont').value    = t.ascont    || '';
+  document.getElementById('fVisitaData').value= t.visitaData|| '';
+  document.getElementById('fVisitaHora').value= t.visitaHora|| '';
 
   // Modo somente leitura — desabilita campos
-  ['fAssunto','fResp','fValor','fDesc'].forEach(id => {
+  ['fAssunto','fResp','fValor','fDesc','fEmpresa','fTelefone','fEndereco','fAscont','fVisitaData','fVisitaHora'].forEach(id => {
     document.getElementById(id).disabled = true;
   });
 
@@ -1541,6 +1627,46 @@ async function reopenTicket(id) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  TICKET DE COMPRAS
+// ═══════════════════════════════════════════════════════════════
+
+function openCompraTicket() {
+  document.getElementById('fCompraDesc').value = '';
+  document.getElementById('fCompraResp').value = me.name;
+  openOverlay('comprasOverlay');
+  setTimeout(() => document.getElementById('fCompraDesc').focus(), 100);
+}
+
+async function saveCompra() {
+  const desc = document.getElementById('fCompraDesc').value.trim();
+  if (!desc) { document.getElementById('fCompraDesc').style.borderColor='var(--red)'; return; }
+  document.getElementById('fCompraDesc').style.borderColor = '';
+
+  const ticketData = {
+    id: null,
+    assunto: '🛒 ' + desc.substring(0, 60),
+    desc,
+    resp: me.name,
+    urgency: 'compra',
+    tags: [], participants: [...ADMINS, me.name].filter((v,i,a)=>a.indexOf(v)===i),
+    images: [], status: 'aberto', createdBy: me.name,
+    empresa:'', telefone:'', endereco:'', ascont:'', visitaData:'', visitaHora:'',
+  };
+
+  const tempId = 'tmp_' + Date.now();
+  tickets.unshift({...ticketData, id: tempId, createdAt: new Date().toISOString(), _pending: true});
+  closeOverlay('comprasOverlay');
+  renderBoard();
+  notify('Pedido de Compras enviado!');
+
+  callAPI({action:'saveTicket', ticket:ticketData}).then(r => {
+    if (!r.ok) { notify(r.error,'err'); return; }
+    if (r.id) { const idx = tickets.findIndex(t=>t.id===tempId); if(idx>=0) tickets[idx].id=r.id; }
+    loadAll(true);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  CONFIG / RESET
 // ═══════════════════════════════════════════════════════════════
 
@@ -1576,6 +1702,45 @@ async function resetDefaultTags() {
   }
   await loadAll(false);
   notify('Tags padrão restauradas!');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ALERTAS DE VISITA AGENDADA
+// ═══════════════════════════════════════════════════════════════
+
+const _alertedVisits = new Set();
+
+function checkVisitAlerts() {
+  if (!me) return;
+  const now = new Date();
+  tickets.forEach(t => {
+    if (!t.visitaData || !t.visitaHora) return;
+    if (t.archived === 'sim' || t.deleted === 'sim') return;
+    // Only alert if I'm responsible or creator
+    if (t.resp !== me.name && t.createdBy !== me.name) return;
+
+    const visitaDate = new Date(t.visitaData + 'T' + t.visitaHora);
+    const diffMin = (visitaDate - now) / 60000;
+
+    // Alert window: between 15 and 16 minutes before
+    if (diffMin > 0 && diffMin <= 15 && !_alertedVisits.has(t.id)) {
+      _alertedVisits.add(t.id);
+      const mins = Math.round(diffMin);
+      const msg  = `⏰ Visita em ${mins} min: ${t.assunto}${t.empresa?' — '+t.empresa:''}${t.endereco?' | '+t.endereco:''}`;
+
+      // In-system notification
+      notify(msg, 'warn');
+
+      // Browser push notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('TicketFlow — Visita Agendada', {
+          body: msg,
+          icon: 'https://cdn-icons-png.flaticon.com/512/1584/1584961.png',
+          tag:  'visit-' + t.id,
+        });
+      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════

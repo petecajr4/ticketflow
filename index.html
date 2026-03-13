@@ -142,13 +142,37 @@ header{
   0%,100%{box-shadow:0 0 0 0 rgba(255,140,66,.5);}
   50%{box-shadow:0 0 0 8px rgba(255,140,66,0);}
 }
-@keyframes pulse-card {
-  0%,100%{box-shadow:0 0 0 0 rgba(255,140,66,.6),0 2px 8px rgba(0,0,0,.18);}
-  50%{box-shadow:0 0 0 6px rgba(255,140,66,0),0 2px 8px rgba(0,0,0,.18);}
+@keyframes pulse-strip {
+  0%,100%{border-color:rgba(255,140,66,.5);}
+  50%{border-color:rgba(255,140,66,1);}
 }
-.tcard-compra {
-  border:2px solid #ff8c42!important;
-  animation: pulse-card 1.5s ease-in-out infinite;
+.compras-strip {
+  background: rgba(255,140,66,.07);
+  border: 1.5px solid rgba(255,140,66,.4);
+  border-radius: 12px;
+  margin: 0 28px 18px;
+  padding: 14px 18px;
+  animation: pulse-strip 2s ease-in-out infinite;
+}
+.compras-strip-hdr {
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;
+}
+.compras-strip-title {
+  font-weight:700;font-size:.88rem;color:#ff8c42;display:flex;align-items:center;gap:8px;
+}
+.compras-cards {
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+.compra-card {
+  background:var(--bg2);border:1.5px solid rgba(255,140,66,.5);border-radius:10px;
+  padding:10px 14px;min-width:200px;max-width:320px;flex:1;cursor:pointer;
+  transition:border-color .15s;position:relative;
+}
+.compra-card:hover { border-color:#ff8c42; }
+.compra-card-top { font-size:.82rem;font-weight:600;color:var(--t1);margin-bottom:4px;line-height:1.4; }
+.compra-card-meta { font-size:.74rem;color:var(--t3); }
+.compra-card-resolved {
+  opacity:.5;border-style:dashed;
 }
 .add-ticket{
   display:flex;align-items:center;gap:8px;padding:11px 14px;
@@ -375,6 +399,7 @@ header{
         <select class="fselect" id="fUser" onchange="renderBoard()"><option value="">Todos usuários</option></select>
       </div>
     </div>
+    <div id="comprasStrip" style="display:none"></div>
     <div class="board-wrap"><div class="board" id="board"></div></div>
   </div>
 
@@ -801,6 +826,7 @@ function renderBoard() {
   const fus = document.getElementById('fUser').value;
   const board = document.getElementById('board');
   board.innerHTML = '';
+  renderComprasStrip();
 
   const boardCols = isAdmin()
     ? [...COLS, {id:'excluido', label:'Excluídos', color:'#e55353'}]
@@ -809,11 +835,13 @@ function renderBoard() {
   boardCols.forEach(col => {
     let cv = tickets.filter(t => {
       if (col.id === 'excluido') return t.deleted === 'sim' && isAdmin();
+      // compras ficam na faixa, não nas colunas
+      if (t.urgency === 'compra') return false;
       return t.status === col.id && t.deleted !== 'sim' && t.archived !== 'sim' && canSee(t);
     });
-    // Ordenar: compras primeiro, depois red, yellow, green
-    const urgOrder = {'compra':0,'red':1,'yellow':2,'green':3};
-    cv.sort((a,b) => (urgOrder[a.urgency]??2) - (urgOrder[b.urgency]??2));
+    // Ordenar: red, yellow, green
+    const urgOrder = {'red':0,'yellow':1,'green':2};
+    cv.sort((a,b) => (urgOrder[a.urgency]??1) - (urgOrder[b.urgency]??1));
     if (q)   cv = cv.filter(t => (t.assunto||'').toLowerCase().includes(q) || (t.resp||'').toLowerCase().includes(q));
     if (fu)  cv = cv.filter(t => t.urgency === fu);
     if (ft)  cv = cv.filter(t => (t.tags||[]).includes(ft));
@@ -845,8 +873,7 @@ function renderBoard() {
 function ticketCardHTML(t) {
   const tagObjs = (t.tags||[]).map(tid => tags.find(x => x.id === tid)).filter(Boolean);
   const age     = ticketAge(t.createdAt);
-  const isCompra = t.urgency === 'compra';
-  return `<div class="tcard ${isCompra ? 'tcard-compra' : 'urg-'+(t.urgency||'yellow')}" draggable="true" data-id="${t.id}" onclick="openTicket('${t.id}')">
+  return `<div class="tcard urg-${t.urgency||'yellow'}" draggable="true" data-id="${t.id}" onclick="openTicket('${t.id}')">
     <div class="tc-top">
       <div class="tc-title">${t.assunto||''}</div>
       <div class="urg-dot" style="background:${urgColor(t.urgency)}" title="${urgLabel(t.urgency)}"></div>
@@ -1629,6 +1656,38 @@ async function reopenTicket(id) {
 // ═══════════════════════════════════════════════════════════════
 //  TICKET DE COMPRAS
 // ═══════════════════════════════════════════════════════════════
+
+function renderComprasStrip() {
+  const strip = document.getElementById('comprasStrip');
+  if (!strip) return;
+  const compras = tickets.filter(t =>
+    t.urgency === 'compra' && t.deleted !== 'sim' && t.archived !== 'sim'
+  );
+  if (!compras.length) { strip.style.display = 'none'; return; }
+  strip.style.display = '';
+
+  const cards = compras.map(t => {
+    const age  = ticketAge(t.createdAt);
+    const resolved = t.status === 'finalizado';
+    return `<div class="compra-card ${resolved?'compra-card-resolved':''}" onclick="openTicket('${t.id}')">
+      <div class="compra-card-top">${t.assunto.replace('🛒 ','')}</div>
+      <div class="compra-card-meta">Por ${t.createdBy||''} · ${age.label} atrás ${resolved?'· ✔ Resolvido':''}</div>
+    </div>`;
+  }).join('');
+
+  const pendentes = compras.filter(t => t.status !== 'finalizado').length;
+  strip.innerHTML = `
+    <div class="compras-strip">
+      <div class="compras-strip-hdr">
+        <div class="compras-strip-title">
+          🛒 Pedidos de Compras
+          ${pendentes ? `<span style="background:#ff8c42;color:#fff;font-size:.72rem;padding:2px 8px;border-radius:20px;font-weight:700">${pendentes} pendente${pendentes>1?'s':''}</span>` : '<span style="color:#1fd080;font-size:.8rem">✔ Todos resolvidos</span>'}
+        </div>
+        <button class="btn" style="font-size:.78rem;padding:4px 12px;background:#ff8c42;color:#fff;border:none" onclick="openCompraTicket()">+ Novo pedido</button>
+      </div>
+      <div class="compras-cards">${cards}</div>
+    </div>`;
+}
 
 function openCompraTicket() {
   document.getElementById('fCompraDesc').value = '';

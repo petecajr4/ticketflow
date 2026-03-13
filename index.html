@@ -516,7 +516,7 @@ let dragId       = null;
 //  API
 // ═══════════════════════════════════════════════════════════════
 async function callAPI(params) {
-  if (API === 'https://script.google.com/macros/s/AKfycby3EY-mk4FmQZxi3AYUj_pbUPjzDNonrIZPt4aeGttRJYDhpNKT57qfbziptX8Jc2Q/exec') {
+  if (!API || API === 'COLE_A_URL_AQUI') {
     notify('⚠️ Configure a URL do Apps Script no arquivo HTML!','err');
     throw new Error('API não configurada');
   }

@@ -595,18 +595,28 @@ function showLoading(on) {
 // ═══════════════════════════════════════════════════════════════
 //  LOAD ALL DATA
 // ═══════════════════════════════════════════════════════════════
-async function loadAll() {
-  const r = await callAPI({action:'getAll'});
-  if (!r.ok) { notify(r.error, 'err'); return; }
-
-  // Normaliza tickets (arrays guardados como JSON string no Sheets)
-  tickets = (r.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
-  tags    = r.tags || [];
-
-  buildFilters();
-  buildColorPicker();
-  renderBoard();
-  renderTagAdmin();
+async function loadAll(silent) {
+  // Tenta carregar do cache local primeiro (instantâneo)
+  const cached = sessionStorage.getItem('tf_cache');
+  if (cached && !silent) {
+    try {
+      const c = JSON.parse(cached);
+      tickets = (c.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
+      tags    = c.tags || [];
+      buildFilters(); buildColorPicker(); renderBoard(); renderTagAdmin();
+    } catch(e) {}
+  }
+  // Sincroniza com servidor em background
+  try {
+    const r = await callAPI({action:'getAll'});
+    if (!r.ok) { if(!cached) notify(r.error, 'err'); return; }
+    sessionStorage.setItem('tf_cache', JSON.stringify({tickets: r.tickets, tags: r.tags}));
+    tickets = (r.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
+    tags    = r.tags || [];
+    buildFilters(); buildColorPicker(); renderBoard(); renderTagAdmin();
+  } catch(e) {
+    if (!cached) notify('Erro ao carregar dados.', 'err');
+  }
 }
 
 function parseTicket(t) {
@@ -781,22 +791,26 @@ async function dropTicket(e, colId) {
   if (colId === 'finalizado' && !isAdmin()) {
     notify('Apenas admins podem finalizar tickets.','err'); return;
   }
-  // Otimista: atualiza UI primeiro
+  // Atualiza UI instantaneamente
+  const movedId = dragId;
+  dragId = null;
   t.status = colId;
   renderBoard();
+  notify('Ticket movido para '+COLS.find(c=>c.id===colId).label);
 
+  // Sincroniza em background
   if (colId === 'finalizado') {
     t.archived = 'sim';
-    const r = await callAPI({action:'archiveTicket', id:dragId});
-    if (!r.ok) { notify(r.error,'err'); await loadAll(); return; }
-    tickets = tickets.filter(x => x.id !== dragId);
+    tickets = tickets.filter(x => x.id !== movedId);
+    renderBoard();
+    callAPI({action:'archiveTicket', id:movedId})
+      .then(r => { if (!r.ok) notify(r.error,'err'); })
+      .catch(() => notify('Erro ao sincronizar.','err'));
   } else {
-    const r = await callAPI({action:'moveTicket', id:dragId, status:colId});
-    if (!r.ok) { notify(r.error,'err'); await loadAll(); return; }
+    callAPI({action:'moveTicket', id:movedId, status:colId})
+      .then(r => { if (!r.ok) notify(r.error,'err'); })
+      .catch(() => notify('Erro ao sincronizar.','err'));
   }
-  renderBoard();
-  notify('Ticket movido para '+COLS.find(c=>c.id===colId).label);
-  dragId = null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -984,13 +998,31 @@ async function saveTicket() {
     createdBy:    editId ? undefined : me.name,
   };
 
-  const r = await callAPI({action:'saveTicket', ticket:ticketData});
-  btn.innerHTML = 'Salvar Ticket'; btn.disabled = false;
-  if (!r.ok) { notify(r.error,'err'); return; }
-
+  // Atualiza local imediatamente (sem esperar servidor)
+  const tempId = editId || ('tmp_' + Date.now());
+  if (editId) {
+    const idx = tickets.findIndex(t => t.id === editId);
+    if (idx >= 0) tickets[idx] = {...tickets[idx], ...ticketData, id: editId};
+  } else {
+    tickets.unshift({...ticketData, id: tempId, status: ticketData.status || 'aberto',
+      createdAt: new Date().toISOString(), createdBy: me.name, _pending: true});
+  }
   closeOverlay('ticketOverlay');
-  await loadAll();
+  renderBoard();
+  btn.innerHTML = 'Salvar Ticket'; btn.disabled = false;
   notify(editId ? 'Ticket atualizado!' : 'Ticket criado!');
+
+  // Sincroniza com servidor em segundo plano
+  callAPI({action:'saveTicket', ticket:ticketData}).then(r => {
+    if (!r.ok) { notify('Erro ao sincronizar: ' + r.error, 'err'); return; }
+    // Substitui id temporário pelo id real do servidor
+    if (!editId && r.id) {
+      const idx = tickets.findIndex(t => t.id === tempId);
+      if (idx >= 0) { tickets[idx].id = r.id; tickets[idx]._pending = false; }
+    }
+    // Atualiza cache
+    loadAll(true);
+  }).catch(() => notify('Sem conexão — ticket salvo localmente.', 'warn'));
 }
 
 // ── FINALIZAR / EXCLUIR ──────────────────────────────────────────

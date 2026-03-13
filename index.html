@@ -340,6 +340,7 @@ header{
     <button class="nav-tab" onclick="showTab('rel')">📊 Relatórios</button>
     <button class="nav-tab admin-only" onclick="showTab('tags')" style="display:none">🏷 Tags</button>
     <button class="nav-tab admin-only" onclick="showTab('arquivo')" style="display:none">🗃 Arquivo</button>
+    <button class="nav-tab admin-only" onclick="showTab('excluidos')" style="display:none">🗑 Excluídos</button>
   </div>
 
   <!-- Barra de contexto para usuários vendas -->
@@ -396,10 +397,19 @@ header{
   <!-- ARQUIVO (admin) -->
   <div id="arquivoTab" style="display:none">
     <div style="margin-bottom:20px">
-      <div class="rel-title">🗃 Arquivo — Tickets Finalizados / Excluídos</div>
+      <div class="rel-title">🗃 Arquivo — Tickets Finalizados</div>
       <p style="color:var(--t2);font-size:.85rem;margin-top:4px">Visível apenas para admins.</p>
     </div>
     <div id="arquivoContent"></div>
+  </div>
+
+  <!-- EXCLUÍDOS (admin) -->
+  <div id="excluidosTab" style="display:none">
+    <div style="margin-bottom:20px">
+      <div class="rel-title">🗑 Excluídos</div>
+      <p style="color:var(--t2);font-size:.85rem;margin-top:4px">Tickets excluídos não entram no relatório nem no valor total. Visível apenas para admins.</p>
+    </div>
+    <div id="excluidosContent"></div>
   </div>
 </div>
 
@@ -641,16 +651,17 @@ function canSee(t) {
 //  TABS
 // ═══════════════════════════════════════════════════════════════
 function showTab(tab) {
-  ['board','rel','tags','arquivo'].forEach(t => {
+  ['board','rel','tags','arquivo','excluidos'].forEach(t => {
     const el = document.getElementById(t==='board'?'boardTab':t+'Tab');
     if (el) el.style.display = t === tab ? '' : 'none';
   });
   document.querySelectorAll('.nav-tab').forEach((el,i) => {
-    el.classList.toggle('active', ['board','rel','tags','arquivo'][i] === tab);
+    el.classList.toggle('active', ['board','rel','tags','arquivo','excluidos'][i] === tab);
   });
-  if (tab === 'rel')    renderRel();
-  if (tab === 'tags')   renderTagAdmin();
-  if (tab === 'arquivo') renderArquivo();
+  if (tab === 'rel')       renderRel();
+  if (tab === 'tags')      renderTagAdmin();
+  if (tab === 'arquivo')   renderArquivo();
+  if (tab === 'excluidos') renderExcluidos();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -677,6 +688,7 @@ function buildFilters() {
 // ═══════════════════════════════════════════════════════════════
 function renderStats() {
   const visible = tickets.filter(t => t.deleted !== 'sim' && t.archived !== 'sim' && canSee(t));
+  // excluídos não somam em nada
   const active  = visible.filter(t => t.status !== 'finalizado');
   const red      = active.filter(t => t.urgency === 'red').length;
   const total    = active.length;
@@ -701,10 +713,15 @@ function renderBoard() {
   const board = document.getElementById('board');
   board.innerHTML = '';
 
-  COLS.forEach(col => {
-    let cv = tickets.filter(t =>
-      t.status === col.id && t.deleted !== 'sim' && t.archived !== 'sim' && canSee(t)
-    );
+  const boardCols = isAdmin()
+    ? [...COLS, {id:'excluido', label:'Excluídos', color:'#e55353'}]
+    : COLS;
+
+  boardCols.forEach(col => {
+    let cv = tickets.filter(t => {
+      if (col.id === 'excluido') return t.deleted === 'sim' && isAdmin();
+      return t.status === col.id && t.deleted !== 'sim' && t.archived !== 'sim' && canSee(t);
+    });
     if (q)   cv = cv.filter(t => (t.assunto||'').toLowerCase().includes(q) || (t.resp||'').toLowerCase().includes(q));
     if (fu)  cv = cv.filter(t => t.urgency === fu);
     if (ft)  cv = cv.filter(t => (t.tags||[]).includes(ft));
@@ -725,7 +742,7 @@ function renderBoard() {
       </div>
       ${col.id === 'aberto' ? '<button class="add-ticket" onclick="openNewTicket()">＋ Novo ticket</button>' : ''}`;
     board.appendChild(div);
-  });
+  }); // boardCols.forEach
 
   document.querySelectorAll('.tcard').forEach(el => {
     el.addEventListener('dragstart', e => { dragId = el.dataset.id; el.classList.add('dragging'); });
@@ -792,16 +809,17 @@ async function dropTicket(e, colId) {
   const flow = {
     'aberto':       ['em-andamento'],
     'em-andamento': ['finalizado'],
-    'finalizado':   [],
+    'finalizado':   ['excluido'],
+    'excluido':     ['em-andamento','finalizado'],
   };
   const allowed = flow[t.status] || [];
   if (!allowed.includes(colId)) {
-    const labels = {'aberto':'Aberto','em-andamento':'Em Andamento','finalizado':'Finalizado'};
+    const labels = {'aberto':'Aberto','em-andamento':'Em Andamento','finalizado':'Finalizado','excluido':'Excluídos'};
     notify(`Não é possível mover de "${labels[t.status]}" para "${labels[colId]}".`,'err');
     return;
   }
-  if (colId === 'finalizado' && !isAdmin()) {
-    notify('Apenas admins podem finalizar tickets.','err'); return;
+  if (['finalizado','excluido'].includes(colId) && !isAdmin()) {
+    notify('Apenas admins podem realizar esta ação.','err'); return;
   }
   // Atualiza UI instantaneamente
   const movedId = dragId;
@@ -812,11 +830,24 @@ async function dropTicket(e, colId) {
 
   // Sincroniza em background
   if (colId === 'finalizado') {
-    t.archived = 'sim';
-    tickets = tickets.filter(x => x.id !== movedId);
+    t.archived = 'sim'; t.deleted = 'nao';
+    if (!isAdmin()) tickets = tickets.filter(x => x.id !== movedId);
     renderBoard();
     callAPI({action:'archiveTicket', id:movedId})
       .then(r => { if (!r.ok) notify(r.error,'err'); })
+      .catch(() => notify('Erro ao sincronizar.','err'));
+  } else if (colId === 'excluido') {
+    t.deleted = 'sim'; t.archived = 'sim';
+    renderBoard();
+    callAPI({action:'deleteTicket', id:movedId, deletedBy:me.name})
+      .then(r => { if (!r.ok) notify(r.error,'err'); })
+      .catch(() => notify('Erro ao sincronizar.','err'));
+  } else if (t.deleted === 'sim' || t.archived === 'sim') {
+    // Reabrir de excluido ou finalizado
+    t.deleted = 'nao'; t.archived = 'nao'; t.status = colId;
+    renderBoard();
+    callAPI({action:'reopenTicket', id:movedId, status:colId})
+      .then(r => { if (!r.ok) notify(r.error,'err'); else loadAll(true); })
       .catch(() => notify('Erro ao sincronizar.','err'));
   } else {
     callAPI({action:'moveTicket', id:movedId, status:colId})
@@ -852,6 +883,14 @@ async function openTicket(id) {
   selTags      = [...(t.tags||[])];
   uploadedImgs = [...(t.images||[])];
 
+  // Re-habilita campos (podem ter sido desativados pelo modo arquivo)
+  ['fAssunto','fResp','fValor','fDesc'].forEach(fid => {
+    document.getElementById(fid).disabled = false;
+  });
+  document.querySelectorAll('.urg-btn,.part-chip,.tag-chip').forEach(el => el.style.pointerEvents='');
+  const btnSave = document.getElementById('btnSave');
+  if (btnSave) btnSave.style.display = '';
+
   document.getElementById('mTitle').textContent = 'Ticket #' + String(id).slice(-6).toUpperCase();
   document.getElementById('mSub').textContent   = `Aberto por ${t.createdBy} · ${ticketAge(t.createdAt).label} atrás`;
   document.getElementById('fAssunto').value = t.assunto || '';
@@ -868,10 +907,13 @@ async function openTicket(id) {
   const moveBtn = tStatus === 'aberto'
     ? `<button class="btn btn-accent" onclick="moveTicketTo('${id}','em-andamento')">▶ Iniciar atendimento</button>`
     : '';
+  const excludeBtn = isAdmin() && tStatus === 'finalizado'
+    ? `<button class="btn btn-danger" onclick="excludeTicket('${id}')">🗑 Excluir</button>`
+    : '';
   aa.innerHTML = isAdmin()
     ? `${moveBtn}
        <button class="btn btn-green"  onclick="finalizeTicket('${id}')">✔ Finalizar</button>
-       <button class="btn btn-danger" onclick="deleteTicket('${id}')">🗑 Excluir</button>
+       ${excludeBtn}
        ${printBtn}`
     : `${moveBtn}${printBtn}`;
 
@@ -1123,6 +1165,20 @@ async function saveTicket() {
 }
 
 // ── FINALIZAR / EXCLUIR ──────────────────────────────────────────
+async function excludeTicket(id) {
+  if (!isAdmin()) return notify('Apenas admins podem excluir.','err');
+  if (!confirm('Mover para Excluídos? O ticket sairá do relatório e do valor total.')) return;
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  t.deleted = 'sim'; t.archived = 'sim';
+  closeOverlay('ticketOverlay');
+  renderBoard();
+  notify('Ticket movido para Excluídos.');
+  callAPI({action:'deleteTicket', id, deletedBy:me.name})
+    .then(r => { if (!r.ok) notify(r.error,'err'); })
+    .catch(() => notify('Erro ao sincronizar.','err'));
+}
+
 async function moveTicketTo(id, newStatus) {
   const t = tickets.find(x => x.id === id);
   if (!t) return;
@@ -1164,7 +1220,7 @@ function renderRel() {
   const rurg= document.getElementById('relUrg').value;
   const rs  = document.getElementById('relStatus').value;
 
-  let all = tickets.filter(t => canSee(t));
+  let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
   if (rt)  all = all.filter(t => (t.tags||[]).includes(rt));
   if (ru)  all = all.filter(t => (t.participants||[]).includes(ru) || t.createdBy===ru);
   if (rurg)all = all.filter(t => t.urgency===rurg);
@@ -1206,7 +1262,7 @@ function printRel() {
   const ru  = document.getElementById('relUser').value;
   const rurg= document.getElementById('relUrg').value;
   const rs  = document.getElementById('relStatus').value;
-  let all = tickets.filter(t => canSee(t));
+  let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
   if (rt)  all = all.filter(t=>(t.tags||[]).includes(rt));
   if (ru)  all = all.filter(t=>(t.participants||[]).includes(ru)||t.createdBy===ru);
   if (rurg)all = all.filter(t=>t.urgency===rurg);
@@ -1327,25 +1383,135 @@ function renderTagAdmin() {
 //  ARQUIVO (admin)
 // ═══════════════════════════════════════════════════════════════
 function renderArquivo() {
-  const all = tickets.filter(t => t.archived === 'sim');
+  const all = tickets.filter(t => t.archived === 'sim' && t.deleted !== 'sim');
   const el  = document.getElementById('arquivoContent');
   if (!all.length) { el.innerHTML='<div style="color:var(--t2)">Nenhum ticket arquivado ainda.</div>'; return; }
   const urgMap = {red:'🔴',yellow:'🟡',green:'🟢'};
   el.innerHTML = `<table class="rel-table">
-    <thead><tr><th>#</th><th>Assunto</th><th>Status</th><th>Urgência</th><th>Criado por</th><th>Valor</th><th>Situação</th></tr></thead>
+    <thead><tr><th>#</th><th>Assunto</th><th>Urgência</th><th>Criado por</th><th>Valor</th><th>Situação</th>${isAdmin()?'<th>Ação</th>':''}</tr></thead>
     <tbody>${all.map(t => {
       const val = parseFloat(t.valor)||0;
-      return `<tr>
+      const isDeleted = t.deleted === 'sim';
+      return `<tr style="cursor:pointer" onclick="openArchivedTicket('${t.id}')">
         <td style="color:var(--t2);font-size:.75rem">#${String(t.id).slice(-6).toUpperCase()}</td>
         <td><strong>${t.assunto||''}</strong></td>
-        <td>${t.deleted==='sim'?'<span style="color:var(--red)">Excluído</span>':'<span style="color:var(--green)">Finalizado</span>'}</td>
         <td>${urgMap[t.urgency]||''}</td>
         <td>${t.createdBy||''}</td>
         <td>${val>0?'R$ '+val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
-        <td style="font-size:.75rem;color:var(--t2)">${t.deleted==='sim'?`Excluído por ${t.deletedBy||'?'}`:'Finalizado'}</td>
+        <td>${isDeleted?'<span style="color:var(--red)">Excluído por '+(t.deletedBy||'?')+'</span>':'<span style="color:var(--green)">Finalizado</span>'}</td>
+        ${isAdmin() ? `<td onclick="event.stopPropagation()">${!isDeleted ? `<button class="btn btn-accent" style="font-size:.75rem;padding:4px 10px" onclick="reopenTicket('${t.id}')">↩ Reabrir</button>` : '—'}</td>` : ''}
       </tr>`;}).join('')}
     </tbody>
   </table>`;
+}
+
+function renderExcluidos() {
+  if (!isAdmin()) return;
+  const all = tickets.filter(t => t.deleted === 'sim');
+  const el  = document.getElementById('excluidosContent');
+  if (!all.length) { el.innerHTML='<div style="color:var(--t2)">Nenhum ticket excluído.</div>'; return; }
+  const urgMap = {red:'🔴',yellow:'🟡',green:'🟢'};
+  el.innerHTML = `<table class="rel-table">
+    <thead><tr><th>#</th><th>Assunto</th><th>Urgência</th><th>Excluído por</th><th>Criado por</th><th>Ações</th></tr></thead>
+    <tbody>${all.map(t => `<tr style="cursor:pointer" onclick="openArchivedTicket('${t.id}')">
+      <td style="color:var(--t2);font-size:.75rem">#${String(t.id).slice(-6).toUpperCase()}</td>
+      <td><strong>${t.assunto||''}</strong></td>
+      <td>${urgMap[t.urgency]||''}</td>
+      <td style="color:var(--red)">${t.deletedBy||'—'}</td>
+      <td>${t.createdBy||''}</td>
+      <td onclick="event.stopPropagation()" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-accent" style="font-size:.75rem;padding:4px 10px" onclick="restoreTicket('${t.id}','em-andamento')">↩ Em Andamento</button>
+        <button class="btn btn-green"  style="font-size:.75rem;padding:4px 10px" onclick="restoreTicket('${t.id}','finalizado')">✔ Finalizado</button>
+      </td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function restoreTicket(id, targetStatus) {
+  if (!isAdmin()) return notify('Apenas admins podem restaurar tickets.','err');
+  const label = targetStatus === 'finalizado' ? 'Finalizado' : 'Em Andamento';
+  if (!confirm(`Restaurar este ticket para "${label}"?`)) return;
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  t.deleted = 'nao'; t.archived = targetStatus === 'finalizado' ? 'sim' : 'nao';
+  t.status  = targetStatus;
+  renderExcluidos();
+  notify(`Ticket restaurado para ${label}!`);
+  callAPI({action:'reopenTicket', id, status:targetStatus})
+    .then(r => { if (!r.ok) notify(r.error,'err'); else loadAll(true); })
+    .catch(() => notify('Erro ao sincronizar.','err'));
+}
+
+async function openArchivedTicket(id) {
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  editId       = id;
+  selUrg       = t.urgency || 'yellow';
+  selParts     = [...(t.participants||[])];
+  selTags      = [...(t.tags||[])];
+  uploadedImgs = [...(t.images||[])];
+
+  document.getElementById('mTitle').textContent = 'Ticket #' + String(id).slice(-6).toUpperCase() + (t.deleted==='sim'?' [EXCLUÍDO]':' [FINALIZADO]');
+  document.getElementById('mSub').textContent   = `Aberto por ${t.createdBy} · ${ticketAge(t.createdAt).label} atrás`;
+  document.getElementById('fAssunto').value = t.assunto || '';
+  document.getElementById('fResp').value    = t.resp    || '';
+  document.getElementById('fValor').value   = t.valor   || '';
+  document.getElementById('fDesc').value    = t.desc    || '';
+
+  // Modo somente leitura — desabilita campos
+  ['fAssunto','fResp','fValor','fDesc'].forEach(id => {
+    document.getElementById(id).disabled = true;
+  });
+
+  buildUrgPicker(); buildPartsPicker(); buildTagsPicker(); renderImgPreview();
+
+  // Desabilita pickers
+  document.querySelectorAll('.urg-btn,.part-chip,.tag-chip').forEach(el => el.style.pointerEvents='none');
+
+  document.getElementById('commentsSection').style.display = '';
+  document.getElementById('commentList').innerHTML = '<div style="color:var(--t3);font-size:.82rem">Carregando...</div>';
+
+  const aa = document.getElementById('adminActions');
+  const printBtn = `<button class="btn" style="background:var(--bg2);border:1px solid var(--border)" onclick="printTicket('${id}')">🖨 Imprimir</button>`;
+  if (isAdmin()) {
+    if (t.deleted === 'sim') {
+      aa.innerHTML = `
+        <button class="btn btn-accent" onclick="restoreTicket('${id}','em-andamento')">↩ Em Andamento</button>
+        <button class="btn btn-green"  onclick="restoreTicket('${id}','finalizado')">✔ Finalizado</button>
+        ${printBtn}`;
+    } else if (t.archived === 'sim') {
+      aa.innerHTML = `<button class="btn btn-accent" onclick="reopenTicket('${id}')">↩ Reabrir ticket</button>${printBtn}`;
+    } else {
+      aa.innerHTML = printBtn;
+    }
+  } else {
+    aa.innerHTML = printBtn;
+  }
+
+  // Esconde botão salvar
+  const btnSave = document.getElementById('btnSave');
+  if (btnSave) btnSave.style.display = 'none';
+
+  openOverlay('ticketOverlay');
+
+  const r = await callAPI({action:'getComments', ticketId:id});
+  if (r.ok) { renderComments(r.comments); window._lastComments = r.comments || []; }
+}
+
+async function reopenTicket(id) {
+  if (!isAdmin()) return notify('Apenas admins podem reabrir tickets.','err');
+  if (!confirm('Reabrir este ticket? Ele voltará para Em Andamento.')) return;
+  const t = tickets.find(x => x.id === id);
+  if (!t) return;
+  t.archived = 'nao';
+  t.status   = 'em-andamento';
+  closeOverlay('ticketOverlay');
+  renderArquivo();
+  notify('Ticket reaberto — voltou para Em Andamento!');
+  callAPI({action:'reopenTicket', id})
+    .then(r => { if (!r.ok) notify(r.error,'err'); else loadAll(true); })
+    .catch(() => notify('Erro ao sincronizar.','err'));
 }
 
 // ═══════════════════════════════════════════════════════════════

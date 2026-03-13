@@ -341,6 +341,7 @@ header{
     <button class="nav-tab admin-only" onclick="showTab('tags')" style="display:none">🏷 Tags</button>
     <button class="nav-tab admin-only" onclick="showTab('arquivo')" style="display:none">🗃 Arquivo</button>
     <button class="nav-tab admin-only" onclick="showTab('excluidos')" style="display:none">🗑 Excluídos</button>
+    <button class="nav-tab admin-only" onclick="showTab('config')" style="display:none">⚙️ Config</button>
   </div>
 
   <!-- Barra de contexto para usuários vendas -->
@@ -410,6 +411,31 @@ header{
       <p style="color:var(--t2);font-size:.85rem;margin-top:4px">Tickets excluídos não entram no relatório nem no valor total. Visível apenas para admins.</p>
     </div>
     <div id="excluidosContent"></div>
+  </div>
+
+  <!-- CONFIG (admin) -->
+  <div id="configTab" style="display:none">
+    <div style="max-width:520px;padding:24px 28px">
+      <div class="rel-title" style="margin-bottom:6px">⚙️ Configurações</div>
+      <p style="color:var(--t2);font-size:.85rem;margin-bottom:28px">Ações administrativas do sistema.</p>
+
+      <div style="border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+        <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">🧹 Limpar dados de teste</h2>
+        <p style="color:var(--t2);font-size:.85rem;margin-bottom:16px;line-height:1.6">
+          Remove <strong>todos os tickets, comentários e tags</strong> do sistema permanentemente.<br>
+          Use apenas para limpar dados de teste antes de começar a usar de verdade.
+        </p>
+        <button class="btn btn-danger" onclick="confirmClearData()">🗑 Apagar todos os dados</button>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:12px;padding:20px">
+        <h2 style="font-size:1rem;font-weight:700;margin-bottom:6px">🏷 Tags padrão</h2>
+        <p style="color:var(--t2);font-size:.85rem;margin-bottom:16px;line-height:1.6">
+          Recria as 5 tags padrão do sistema caso tenham sido apagadas.
+        </p>
+        <button class="btn btn-accent" onclick="resetDefaultTags()">↩ Restaurar tags padrão</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -651,12 +677,12 @@ function canSee(t) {
 //  TABS
 // ═══════════════════════════════════════════════════════════════
 function showTab(tab) {
-  ['board','rel','tags','arquivo','excluidos'].forEach(t => {
+  ['board','rel','tags','arquivo','excluidos','config'].forEach(t => {
     const el = document.getElementById(t==='board'?'boardTab':t+'Tab');
     if (el) el.style.display = t === tab ? '' : 'none';
   });
   document.querySelectorAll('.nav-tab').forEach((el,i) => {
-    el.classList.toggle('active', ['board','rel','tags','arquivo','excluidos'][i] === tab);
+    el.classList.toggle('active', ['board','rel','tags','arquivo','excluidos','config'][i] === tab);
   });
   if (tab === 'rel')       renderRel();
   if (tab === 'tags')      renderTagAdmin();
@@ -1512,6 +1538,44 @@ async function reopenTicket(id) {
   callAPI({action:'reopenTicket', id})
     .then(r => { if (!r.ok) notify(r.error,'err'); else loadAll(true); })
     .catch(() => notify('Erro ao sincronizar.','err'));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG / RESET
+// ═══════════════════════════════════════════════════════════════
+
+function confirmClearData() {
+  if (!isAdmin()) return;
+  const first = confirm('⚠️ ATENÇÃO: Isso vai apagar TODOS os tickets, comentários e tags permanentemente.\n\nTem certeza que deseja continuar?');
+  if (!first) return;
+  const second = prompt('Para confirmar, digite exatamente:  APAGAR TUDO');
+  if (second !== 'APAGAR TUDO') { notify('Operação cancelada.', 'warn'); return; }
+  notify('Apagando dados...', 'warn');
+  callAPI({action: 'clearAllData'}).then(r => {
+    if (!r.ok) { notify(r.error, 'err'); return; }
+    tickets = []; tags = [];
+    sessionStorage.removeItem('tf_cache');
+    renderBoard(); renderTagAdmin();
+    notify('Todos os dados foram apagados. Sistema limpo!');
+    showTab('board');
+  }).catch(() => notify('Erro ao apagar dados.', 'err'));
+}
+
+async function resetDefaultTags() {
+  if (!isAdmin()) return;
+  if (!confirm('Recriar as 5 tags padrão? Tags existentes não serão apagadas.')) return;
+  const defaults = [
+    {name:'Refração',        color:'#5b8aff'},
+    {name:'Visita sem venda',color:'#f5b731'},
+    {name:'Manutenção',      color:'#1fd080'},
+    {name:'Comercial',       color:'#e05cf7'},
+    {name:'Suporte',         color:'#ff6b6b'},
+  ];
+  for (const t of defaults) {
+    await callAPI({action:'saveTag', name:t.name, color:t.color});
+  }
+  await loadAll(false);
+  notify('Tags padrão restauradas!');
 }
 
 // ═══════════════════════════════════════════════════════════════

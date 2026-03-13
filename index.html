@@ -521,8 +521,9 @@ async function callAPI(params) {
     throw new Error('API não configurada');
   }
   try {
-    const res = await fetch(API + '?action=' + params.action, {
+    const res = await fetch(API + '?action=' + params.action + '&t=' + Date.now(), {
       method: 'POST',
+      redirect: 'follow',
       body:   JSON.stringify(params),
     });
     return await res.json();

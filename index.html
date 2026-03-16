@@ -746,15 +746,8 @@ let dragId       = null;
 // ═══════════════════════════════════════════════════════════════
 async function callAPI(params) {
   try {
-    let res;
-    if (params.action === 'uploadImage') {
-      res = await fetch(API + '?action=uploadImage&t=' + Date.now(), {
-        method: 'POST', redirect: 'follow', body: JSON.stringify(params),
-      });
-    } else {
-      const url = API + '?action=' + params.action + '&payload=' + encodeURIComponent(JSON.stringify(params)) + '&t=' + Date.now();
-      res = await fetch(url, { method: 'GET', redirect: 'follow' });
-    }
+    const url = API + '?action=' + params.action + '&payload=' + encodeURIComponent(JSON.stringify(params)) + '&t=' + Date.now();
+    const res = await fetch(url, { method: 'GET', redirect: 'follow' });
     const text = await res.text();
     try { return JSON.parse(text); } catch(_) {}
     const start = text.search(/[{\[]/);
@@ -1334,6 +1327,9 @@ function toggleTag(id, el) {
 }
 
 // ── IMAGENS ──────────────────────────────────────────────────────
+const CLOUDINARY_CLOUD = 'dltbtycrh';
+const CLOUDINARY_PRESET = 'ticketflow';
+
 function compressImage(file) {
   return new Promise(resolve => {
     const reader = new FileReader();
@@ -1355,10 +1351,17 @@ function compressImage(file) {
   });
 }
 
-async function uploadImgToDrive(base64, ticketId) {
+async function uploadToCloudinary(base64) {
   try {
-    const r = await callAPI({action:'uploadImage', base64, ticketId: ticketId || 'novo_' + Date.now()});
-    if (r.ok && r.url) return r.url;
+    const formData = new FormData();
+    formData.append('file', base64);
+    formData.append('upload_preset', CLOUDINARY_PRESET);
+    const res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (data.secure_url) return data.secure_url;
     return base64;
   } catch(e) {
     return base64;
@@ -1433,7 +1436,7 @@ async function addComment() {
   const btn = document.querySelector('#commentsSection .btn-accent');
   btn.innerHTML = '<span class="loader"></span>'; btn.disabled = true;
 
-  const imgUrl = cmtImgData ? await uploadImgToDrive(cmtImgData, editId) : '';
+  const imgUrl = cmtImgData ? await uploadToCloudinary(cmtImgData) : '';
   const r = await callAPI({action:'addComment', ticketId:editId, author:me.name, text:txt, img:imgUrl});
   btn.innerHTML = 'Enviar'; btn.disabled = false;
   if (!r.ok) { notify(r.error,'err'); return; }
@@ -1496,7 +1499,7 @@ async function saveTicket() {
     tags:         selTags,
     participants: selParts,
     images:       await Promise.all(uploadedImgs.map(img =>
-      img.startsWith('data:') ? uploadImgToDrive(img, editId) : Promise.resolve(img)
+      img.startsWith('data:') ? uploadToCloudinary(img) : Promise.resolve(img)
     )),
     status:       editId ? (tickets.find(t=>t.id===editId)||{}).status : (document.getElementById('fAssunto').dataset.col||'aberto'),
     createdBy:    editId ? undefined : me.name,

@@ -1254,11 +1254,28 @@ function setUrg(u, btn) {
 
 // ── PARTICIPANTES ────────────────────────────────────────────────
 function buildPartsPicker() {
-  document.getElementById('partsWrap').innerHTML = Object.keys(USERS).map(u =>
-    `<div class="part-chip ${selParts.includes(u)?'sel':''}" onclick="togglePart('${u}',this)">${u}</div>`
-  ).join('');
+  document.getElementById('partsWrap').innerHTML = Object.keys(USERS).map(u => {
+    const isAdminUser = USERS[u].role === 'admin';
+    // Vendas não podem desmarcar admins
+    const locked = !isAdmin() && isAdminUser;
+    const lockedStyle = locked ? 'opacity:.5;cursor:not-allowed;' : '';
+    const lockIcon = locked ? ' 🔒' : '';
+    return `<div class="part-chip ${selParts.includes(u)?'sel':''}"
+      style="${lockedStyle}"
+      onclick="togglePart('${u}',this,${locked})">${u}${lockIcon}</div>`;
+  }).join('');
 }
-function togglePart(name, el) {
+function togglePart(name, el, locked) {
+  if (locked) { notify('Admins não podem ser removidos por usuários de vendas.','warn'); return; }
+  const targetIsAdmin = USERS[name]?.role === 'admin';
+  // Vendas: não podem mexer em admins
+  if (!isAdmin() && targetIsAdmin) {
+    notify('Apenas admins podem remover outros admins da conversa.','warn'); return;
+  }
+  // Admin: só pode desmarcar a si mesmo (não outros admins)
+  if (isAdmin() && targetIsAdmin && name !== me.name && selParts.includes(name)) {
+    notify('Cada admin só pode se remover da conversa, não remover outros admins.','warn'); return;
+  }
   selParts = selParts.includes(name) ? selParts.filter(x=>x!==name) : [...selParts, name];
   el.classList.toggle('sel', selParts.includes(name));
 }
@@ -1399,6 +1416,19 @@ async function saveTicket() {
   const assunto = document.getElementById('fAssunto').value.trim();
   if (!assunto) { document.getElementById('fAssunto').style.borderColor='var(--red)'; document.getElementById('fAssunto').focus(); return; }
   document.getElementById('fAssunto').style.borderColor = '';
+
+  // Tag obrigatória
+  if (!selTags.length) {
+    const tagsWrap = document.getElementById('tagsWrap');
+    tagsWrap.style.border = '1.5px solid var(--red)';
+    tagsWrap.style.borderRadius = '8px';
+    tagsWrap.style.padding = '8px';
+    notify('Selecione ao menos uma tag antes de salvar.','err');
+    tagsWrap.scrollIntoView({behavior:'smooth', block:'center'});
+    setTimeout(() => { tagsWrap.style.border=''; tagsWrap.style.padding=''; }, 3000);
+    return;
+  }
+
   const btn = document.getElementById('btnSave');
   btn.innerHTML = '<span class="loader"></span>'; btn.disabled = true;
 

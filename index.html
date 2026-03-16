@@ -837,7 +837,7 @@ async function loadAll(silent) {
     try {
       const c = JSON.parse(cached);
       tickets = (c.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
-      tags    = c.tags || [];
+      tags = c.tags && c.tags.length ? c.tags : getDefaultTags();
       buildFilters(); buildColorPicker(); renderBoard(); renderTagAdmin();
     } catch(e) {}
   }
@@ -847,11 +847,19 @@ async function loadAll(silent) {
     if (!r.ok) { if(!cached) notify(r.error, 'err'); return; }
     sessionStorage.setItem('tf_cache', JSON.stringify({tickets: r.tickets, tags: r.tags}));
     tickets = (r.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
-    tags    = r.tags || [];
+    tags = r.tags && r.tags.length ? r.tags : getDefaultTags();
     buildFilters(); buildColorPicker(); renderBoard(); renderTagAdmin();
   } catch(e) {
     if (!cached) notify('Erro ao carregar dados.', 'err');
   }
+}
+
+function getDefaultTags() {
+  return [
+    {id:'tag_refracao',   name:'Refração',   color:'#5b8aff'},
+    {id:'tag_revendaoff', name:'Revenda Off', color:'#1fd080'},
+    {id:'tag_orcamento',  name:'Orçamento',  color:'#e05cf7'},
+  ];
 }
 
 function parseTicket(t) {
@@ -1158,8 +1166,8 @@ async function openTicket(id) {
     ? `<button class="btn btn-danger" onclick="excludeTicket('${id}')">🗑 Excluir</button>`
     : '';
   // Orçamento buttons — show if ticket has Orçamento tag and is not yet decided
-  const orcTag = tags.find(t => t.name === 'Orçamento');
-  const hasOrc = orcTag && (tkt.tags||[]).includes(orcTag.id);
+  const orcTag = tags.find(t => t.name === 'Orçamento') || {id:'tag_orcamento'};
+  const hasOrc = (tkt.tags||[]).includes(orcTag.id);
   const orcStatus = tkt.orcStatus || '';
   const orcBtns = isAdmin() && hasOrc && tStatus !== 'finalizado' ? `
     <button class="btn" style="background:#1fd08022;color:#1fd080;border:1px solid #1fd08044;font-weight:700"
@@ -1293,14 +1301,14 @@ function buildTagsPicker() {
   updateRefracaoField();
 }
 function updateRefracaoField() {
-  const refTag = tags.find(t => t.name === 'Refração');
-  const show = refTag && selTags.includes(refTag.id);
+  const refTag = tags.find(t => t.name === 'Refração') || {id:'tag_refracao'};
+  const show = selTags.includes(refTag.id);
   const field = document.getElementById('refracaoField');
   if (field) field.style.display = show ? '' : 'none';
 
   // Show orcamento status field when Orçamento tag selected
-  const orcTag = tags.find(t => t.name === 'Orçamento');
-  const showOrc = orcTag && selTags.includes(orcTag.id);
+  const orcTag = tags.find(t => t.name === 'Orçamento') || {id:'tag_orcamento'};
+  const showOrc = selTags.includes(orcTag.id);
   const orcField = document.getElementById('orcamentoStatusField');
   if (orcField) orcField.style.display = showOrc ? '' : 'none';
 }
@@ -1758,12 +1766,7 @@ function renderRefracao() {
   const customDiv = document.getElementById('refCustomRange');
   if (customDiv) customDiv.style.display = periodo === 'custom' ? 'flex' : 'none';
 
-  const refTag = tags.find(t => t.name === 'Refração');
-  if (!refTag) {
-    document.getElementById('refracaoContent').innerHTML =
-      '<p style="color:var(--t2);padding:24px">Nenhuma tag "Refração" encontrada.</p>';
-    return;
-  }
+  const refTag = tags.find(t => t.name === 'Refração') || {id:'tag_refracao'};
 
   const {de, ate} = getRefracaoDates();
   const filtResp = document.getElementById('refResp')?.value || '';
@@ -1861,8 +1864,7 @@ function renderRefracao() {
 
 function printRefracao() {
   if (!isAdmin()) return;
-  const refTag = tags.find(t => t.name === 'Refração');
-  if (!refTag) return;
+  const refTag = tags.find(t => t.name === 'Refração') || {id:'tag_refracao'};
   const {de, ate} = getRefracaoDates();
   const filtResp = document.getElementById('refResp')?.value || '';
   let tks = tickets.filter(t => {
@@ -2092,8 +2094,7 @@ function renderComprasStrip() {
 function renderRefracaoStrip() {
   const strip = document.getElementById('refracaoStrip');
   if (!strip) return;
-  const refTag = tags.find(t => t.name === 'Refração');
-  if (!refTag) { strip.style.display = 'none'; return; }
+  const refTag = tags.find(t => t.name === 'Refração') || {id:'tag_refracao'};
 
   const refTks = tickets.filter(t =>
     (t.tags||[]).includes(refTag.id) &&
@@ -2229,17 +2230,12 @@ function confirmClearData() {
 
 async function resetDefaultTags() {
   if (!isAdmin()) return;
-  if (!confirm('Recriar as 5 tags padrão? Tags existentes não serão apagadas.')) return;
-  const defaults = [
-    {name:'Refração',  color:'#5b8aff'},
-    {name:'Revenda Off',color:'#1fd080'},
-    {name:'Orçamento', color:'#e05cf7'},
-  ];
-  for (const t of defaults) {
+  if (!confirm('Sincronizar as 3 tags padrão com a planilha?')) return;
+  for (const t of getDefaultTags()) {
     await callAPI({action:'saveTag', name:t.name, color:t.color});
   }
   await loadAll(false);
-  notify('Tags padrão restauradas!');
+  notify('Tags padrão sincronizadas!');
 }
 
 // ═══════════════════════════════════════════════════════════════

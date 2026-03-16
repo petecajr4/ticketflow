@@ -749,10 +749,15 @@ async function callAPI(params) {
     const url = API + '?action=' + params.action + '&payload=' + encodeURIComponent(JSON.stringify(params)) + '&t=' + Date.now();
     const res = await fetch(url, { method: 'GET', redirect: 'follow' });
     const text = await res.text();
+    console.log('[TicketFlow] status:', res.status, '| body[:200]:', text.slice(0, 200));
+    // Tenta JSON direto
+    try { return JSON.parse(text); } catch(_) {}
+    // Fallback: localiza primeiro { ou [
     const start = text.search(/[{\[]/);
-    if (start === -1) throw new Error('Resposta inválida');
-    return JSON.parse(text.slice(start));
+    if (start !== -1) return JSON.parse(text.slice(start));
+    throw new Error('Resposta inesperada: ' + text.slice(0, 120));
   } catch(e) {
+    console.error('[TicketFlow] callAPI error:', e.message);
     notify('Erro de conexão com o servidor.', 'err');
     throw e;
   }

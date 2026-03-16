@@ -748,7 +748,10 @@ async function callAPI(params) {
   try {
     const url = API + '?action=' + params.action + '&payload=' + encodeURIComponent(JSON.stringify(params)) + '&t=' + Date.now();
     const res = await fetch(url, { method: 'GET', redirect: 'follow' });
-    return await res.json();
+    const text = await res.text();
+    const start = text.search(/[{\[]/);
+    if (start === -1) throw new Error('Resposta inválida');
+    return JSON.parse(text.slice(start));
   } catch(e) {
     notify('Erro de conexão com o servidor.', 'err');
     throw e;

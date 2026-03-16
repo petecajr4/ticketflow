@@ -746,13 +746,22 @@ let dragId       = null;
 // ═══════════════════════════════════════════════════════════════
 async function callAPI(params) {
   try {
-    const url = API + '?action=' + params.action + '&payload=' + encodeURIComponent(JSON.stringify(params)) + '&t=' + Date.now();
-    const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+    let res;
+    if (params.action === 'uploadImage') {
+      res = await fetch(API + '?action=uploadImage&t=' + Date.now(), {
+        method: 'POST', redirect: 'follow', body: JSON.stringify(params),
+      });
+    } else {
+      const url = API + '?action=' + params.action + '&payload=' + encodeURIComponent(JSON.stringify(params)) + '&t=' + Date.now();
+      res = await fetch(url, { method: 'GET', redirect: 'follow' });
+    }
     const text = await res.text();
+    try { return JSON.parse(text); } catch(_) {}
     const start = text.search(/[{\[]/);
-    if (start === -1) throw new Error('Resposta inválida');
-    return JSON.parse(text.slice(start));
+    if (start !== -1) return JSON.parse(text.slice(start));
+    throw new Error('Resposta inválida');
   } catch(e) {
+    console.error('[TicketFlow] callAPI error:', e.message);
     notify('Erro de conexão com o servidor.', 'err');
     throw e;
   }
@@ -1325,44 +1334,11 @@ function toggleTag(id, el) {
 }
 
 // ── IMAGENS ──────────────────────────────────────────────────────
-// Comprime imagem para ~150KB e retorna base64
-function compressImage(file) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX_W = 1024, MAX_H = 768;
-        let w = img.width, h = img.height;
-        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
-        if (h > MAX_H) { w = Math.round(w * MAX_H / h); h = MAX_H; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-// Faz upload da imagem para o Google Drive via backend
-async function uploadImgToDrive(base64, ticketId) {
-  try {
-    const r = await callAPI({action: 'uploadImage', base64, ticketId: ticketId || 'novo_' + Date.now()});
-    if (r.ok && r.url) return r.url;
-    return base64;
-  } catch(e) {
-    return base64;
-  }
-}
-
 function handleImgs(inp) {
-  Array.from(inp.files).forEach(async f => {
-    const compressed = await compressImage(f);
-    uploadedImgs.push(compressed);
-    renderImgPreview();
+  Array.from(inp.files).forEach(f => {
+    const r = new FileReader();
+    r.onload = e => { uploadedImgs.push(e.target.result); renderImgPreview(); };
+    r.readAsDataURL(f);
   });
   inp.value = '';
 }
@@ -1413,10 +1389,9 @@ function renderComments(coms) {
 
 function previewCmtImg(inp) {
   const f = inp.files[0]; if (!f) return;
-  compressImage(f).then(compressed => {
-    cmtImgData = compressed;
-    document.getElementById('cmtImgPreview').textContent = '📎 '+f.name;
-  });
+  const r = new FileReader();
+  r.onload = e => { cmtImgData = e.target.result; document.getElementById('cmtImgPreview').textContent = '📎 '+f.name; };
+  r.readAsDataURL(f);
 }
 
 async function addComment() {
@@ -1426,8 +1401,7 @@ async function addComment() {
   const btn = document.querySelector('#commentsSection .btn-accent');
   btn.innerHTML = '<span class="loader"></span>'; btn.disabled = true;
 
-  const imgUrl = cmtImgData ? await uploadImgToDrive(cmtImgData, editId) : '';
-  const r = await callAPI({action:'addComment', ticketId:editId, author:me.name, text:txt, img:imgUrl});
+  const r = await callAPI({action:'addComment', ticketId:editId, author:me.name, text:txt, img:cmtImgData||''});
   btn.innerHTML = 'Enviar'; btn.disabled = false;
   if (!r.ok) { notify(r.error,'err'); return; }
   cmtImgData = null;
@@ -1488,9 +1462,7 @@ async function saveTicket() {
     urgency:      selUrg,
     tags:         selTags,
     participants: selParts,
-    images:       await Promise.all(uploadedImgs.map(img =>
-      img.startsWith('data:') ? uploadImgToDrive(img, editId) : Promise.resolve(img)
-    )),
+    images:       uploadedImgs,
     status:       editId ? (tickets.find(t=>t.id===editId)||{}).status : (document.getElementById('fAssunto').dataset.col||'aberto'),
     createdBy:    editId ? undefined : me.name,
   };

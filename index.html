@@ -841,7 +841,7 @@ async function loadAll(silent) {
   try {
     const r = await callAPI({action:'getAll'});
     if (!r.ok) { if(!cached) notify(r.error, 'err'); return; }
-    sessionStorage.setItem('tf_cache', JSON.stringify({tickets: r.tickets, tags: r.tags}));
+    try { sessionStorage.setItem('tf_cache', JSON.stringify({tickets: r.tickets, tags: r.tags})); } catch(_) {}
     tickets = (r.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
     tags = r.tags && r.tags.length ? r.tags : getDefaultTags();
     buildFilters(); buildColorPicker(); renderBoard(); renderTagAdmin();

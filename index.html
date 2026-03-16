@@ -1602,16 +1602,16 @@ async function deleteTicket(id) {
 //  RELATÓRIOS
 // ═══════════════════════════════════════════════════════════════
 function renderRel() {
-  const rt  = document.getElementById('relTag').value;
-  const ru  = document.getElementById('relUser').value;
-  const rurg= document.getElementById('relUrg').value;
-  const rs  = document.getElementById('relStatus').value;
+  const rt  = document.getElementById('relTag') ? document.getElementById('relTag').value : '';
+  const ru  = document.getElementById('relUser') ? document.getElementById('relUser').value : '';
+  const rs  = document.getElementById('relStatus') ? document.getElementById('relStatus').value : '';
 
   let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
   if (rt)  all = all.filter(t => (t.tags||[]).includes(rt));
   if (ru)  all = all.filter(t => (t.participants||[]).includes(ru) || t.createdBy===ru);
-  if (rurg)all = all.filter(t => t.urgency===rurg);
-  if (rs)  all = all.filter(t => t.status===rs);
+  if (rs === 'positivado') all = all.filter(t => t.orcStatus === 'positivado');
+  else if (rs === 'negativo') all = all.filter(t => t.orcStatus === 'negativo');
+  else if (rs)  all = all.filter(t => t.status===rs);
 
   const totalVal = all.reduce((s,t) => s+(parseFloat(t.valor)||0), 0);
   const withVal  = all.filter(t => parseFloat(t.valor)>0);

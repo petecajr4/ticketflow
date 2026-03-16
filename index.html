@@ -841,13 +841,12 @@ async function loadAll(silent) {
   try {
     const r = await callAPI({action:'getAll'});
     if (!r.ok) { if(!cached) notify(r.error, 'err'); return; }
-    try { sessionStorage.setItem('tf_cache', JSON.stringify({tickets: r.tickets, tags: r.tags})); } catch(_) {}
+    sessionStorage.setItem('tf_cache', JSON.stringify({tickets: r.tickets, tags: r.tags}));
     tickets = (r.tickets || []).map(parseTicket).filter(t => t.archived !== 'sim' || isAdmin());
     tags = r.tags && r.tags.length ? r.tags : getDefaultTags();
     buildFilters(); buildColorPicker(); renderBoard(); renderTagAdmin();
   } catch(e) {
     if (!cached) notify('Erro ao carregar dados.', 'err');
-    console.error('[TicketFlow] loadAll error:', e.message, e.stack);
   }
 }
 
@@ -1326,11 +1325,44 @@ function toggleTag(id, el) {
 }
 
 // ── IMAGENS ──────────────────────────────────────────────────────
+// Comprime imagem para ~150KB e retorna base64
+function compressImage(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_W = 1024, MAX_H = 768;
+        let w = img.width, h = img.height;
+        if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
+        if (h > MAX_H) { w = Math.round(w * MAX_H / h); h = MAX_H; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Faz upload da imagem para o Google Drive via backend
+async function uploadImgToDrive(base64, ticketId) {
+  try {
+    const r = await callAPI({action: 'uploadImage', base64, ticketId: ticketId || 'novo_' + Date.now()});
+    if (r.ok && r.url) return r.url;
+    return base64;
+  } catch(e) {
+    return base64;
+  }
+}
+
 function handleImgs(inp) {
-  Array.from(inp.files).forEach(f => {
-    const r = new FileReader();
-    r.onload = e => { uploadedImgs.push(e.target.result); renderImgPreview(); };
-    r.readAsDataURL(f);
+  Array.from(inp.files).forEach(async f => {
+    const compressed = await compressImage(f);
+    uploadedImgs.push(compressed);
+    renderImgPreview();
   });
   inp.value = '';
 }
@@ -1381,9 +1413,10 @@ function renderComments(coms) {
 
 function previewCmtImg(inp) {
   const f = inp.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = e => { cmtImgData = e.target.result; document.getElementById('cmtImgPreview').textContent = '📎 '+f.name; };
-  r.readAsDataURL(f);
+  compressImage(f).then(compressed => {
+    cmtImgData = compressed;
+    document.getElementById('cmtImgPreview').textContent = '📎 '+f.name;
+  });
 }
 
 async function addComment() {
@@ -1393,7 +1426,8 @@ async function addComment() {
   const btn = document.querySelector('#commentsSection .btn-accent');
   btn.innerHTML = '<span class="loader"></span>'; btn.disabled = true;
 
-  const r = await callAPI({action:'addComment', ticketId:editId, author:me.name, text:txt, img:cmtImgData||''});
+  const imgUrl = cmtImgData ? await uploadImgToDrive(cmtImgData, editId) : '';
+  const r = await callAPI({action:'addComment', ticketId:editId, author:me.name, text:txt, img:imgUrl});
   btn.innerHTML = 'Enviar'; btn.disabled = false;
   if (!r.ok) { notify(r.error,'err'); return; }
   cmtImgData = null;
@@ -1454,7 +1488,9 @@ async function saveTicket() {
     urgency:      selUrg,
     tags:         selTags,
     participants: selParts,
-    images:       uploadedImgs,
+    images:       await Promise.all(uploadedImgs.map(img =>
+      img.startsWith('data:') ? uploadImgToDrive(img, editId) : Promise.resolve(img)
+    )),
     status:       editId ? (tickets.find(t=>t.id===editId)||{}).status : (document.getElementById('fAssunto').dataset.col||'aberto'),
     createdBy:    editId ? undefined : me.name,
   };

@@ -1721,11 +1721,23 @@ function getRelDates() {
 }
 
 function printRel() {
+  // ✅ NOVO: Usar as datas
+  const {de, ate} = getRelDates();
+
   const rt  = document.getElementById('relTag').value;
   const ru  = document.getElementById('relUser').value;
   const rurg= document.getElementById('relUrg').value;
   const rs  = document.getElementById('relStatus').value;
+  
   let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
+  
+  // ✅ NOVO: Filtrar por data
+  all = all.filter(t => {
+    if (!t.createdAt) return true;
+    const dt = new Date(t.createdAt);
+    return dt >= de && dt < ate;
+  });
+
   if (rt)  all = all.filter(t=>(t.tags||[]).includes(rt));
   if (ru)  all = all.filter(t=>(t.participants||[]).includes(ru)||t.createdBy===ru);
   if (rs === 'positivado') all = all.filter(t=>t.orcStatus==='positivado');

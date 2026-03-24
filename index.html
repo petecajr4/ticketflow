@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TicketFlow v2.3 — Gestão de Visitas</title>
+<title>TicketFlow v2.4 — Gestão de Visitas</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -390,7 +390,7 @@ header{
 <!-- ══ APP ══ -->
 <div id="app">
   <header>
-    <div class="brand"><div class="brand-dot">🎯</div>TicketFlow <span style="font-size:0.65rem;color:var(--t2);margin-left:4px;opacity:0.7">(v2.3)</span></div>
+    <div class="brand"><div class="brand-dot">🎯</div>TicketFlow <span style="font-size:0.65rem;color:var(--t2);margin-left:4px;opacity:0.7">(v2.4)</span></div>
     <div class="hdr-right">
       <div class="user-pill">
         <span id="hdrName"></span>
@@ -1721,11 +1721,21 @@ function getRelDates() {
 }
 
 function printRel() {
+  // ✅ NOVO: Usar as datas
+  const {de, ate} = getRelDates();
+
   const rt  = document.getElementById('relTag').value;
   const ru  = document.getElementById('relUser').value;
   const rurg= document.getElementById('relUrg').value;
   const rs  = document.getElementById('relStatus').value;
   let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
+  
+  // ✅ NOVO: Filtrar por data
+  all = all.filter(t => {
+    if (!t.createdAt) return true;
+    const dt = new Date(t.createdAt);
+    return dt >= de && dt < ate;
+  });
   if (rt)  all = all.filter(t=>(t.tags||[]).includes(rt));
   if (ru)  all = all.filter(t=>(t.participants||[]).includes(ru)||t.createdBy===ru);
   if (rs === 'positivado') all = all.filter(t=>t.orcStatus==='positivado');

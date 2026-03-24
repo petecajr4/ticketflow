@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TicketFlow v2.4 — Gestão de Visitas</title>
+<title>TicketFlow v2.5 — Gestão de Visitas</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -390,7 +390,7 @@ header{
 <!-- ══ APP ══ -->
 <div id="app">
   <header>
-    <div class="brand"><div class="brand-dot">🎯</div>TicketFlow <span style="font-size:0.65rem;color:var(--t2);margin-left:4px;opacity:0.7">(v2.4)</span></div>
+    <div class="brand"><div class="brand-dot">🎯</div>TicketFlow <span style="font-size:0.65rem;color:var(--t2);margin-left:4px;opacity:0.7">(v2.5)</span></div>
     <div class="hdr-right">
       <div class="user-pill">
         <span id="hdrName"></span>
@@ -1624,7 +1624,7 @@ function renderRel() {
   const customDiv = document.getElementById('relCustomRange');
   if (customDiv) customDiv.style.display = periodo === 'custom' ? 'flex' : 'none';
 
-  // ✅ NOVO: Validar permissão para relatórios de positivado/negativo
+  // ✅ NOVO: Validar permissão para positivado/negativo
   const rs_temp = document.getElementById('relStatus').value;
   if ((rs_temp === 'positivado' || rs_temp === 'negativo') && !isAdmin()) {
     document.getElementById('relContent').innerHTML = 
@@ -1632,12 +1632,12 @@ function renderRel() {
     return;
   }
 
-  // ✅ NOVO: Função para pegar as datas
+  // ✅ NOVO: Obter datas
   const {de, ate} = getRelDates();
 
   const rt  = document.getElementById('relTag').value;
   const ru  = document.getElementById('relUser').value;
-  const rurg= document.getElementById('relUrg').value;
+  const rurg= document.getElementById('relUrg')?.value || '';
   const rs  = document.getElementById('relStatus').value;
 
   let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
@@ -1721,12 +1721,11 @@ function getRelDates() {
 }
 
 function printRel() {
-  // ✅ NOVO: Usar as datas
+  // ✅ NOVO: Obter datas
   const {de, ate} = getRelDates();
 
   const rt  = document.getElementById('relTag').value;
   const ru  = document.getElementById('relUser').value;
-  const rurg= document.getElementById('relUrg').value;
   const rs  = document.getElementById('relStatus').value;
   let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
   

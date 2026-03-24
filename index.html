@@ -1294,16 +1294,22 @@ function setUrg(u, btn) {
 
 // ── PARTICIPANTES ────────────────────────────────────────────────
 function buildPartsPicker() {
-  // Determinar quem é o criador do ticket atual
   const creatorName = editId ? ((tickets.find(t=>t.id===editId)||{}).createdBy || me.name) : me.name;
 
   document.getElementById('partsWrap').innerHTML = Object.keys(USERS).map(u => {
     const isAdminUser = USERS[u].role === 'admin';
-    // Vendas não podem desmarcar admins
-    const lockedAdmin = !isAdmin() && isAdminUser;
-    // Criador não pode ser removido por ninguém
-    const lockedCreator = u === creatorName && selParts.includes(u);
-    const locked = lockedAdmin || lockedCreator;
+    const isCreator   = u === creatorName;
+    // Não-admins: só podem marcar novas pessoas, nunca desmarcar ninguém marcado
+    const lockedNonAdmin = !isAdmin() && selParts.includes(u);
+    // Criador: nunca pode ser desmarcado por ninguém
+    const lockedCreator  = isCreator && selParts.includes(u);
+    // Admin tentando se desmarcar quando é o único admin restante
+    const adminsSelected = selParts.filter(p => USERS[p]?.role === 'admin');
+    const lockedLastAdmin = isAdmin() && isAdminUser && u === me.name && selParts.includes(u) && adminsSelected.length <= 1;
+    // Admin tentando desmarcar outro admin (não pode)
+    const lockedOtherAdmin = isAdmin() && isAdminUser && u !== me.name && selParts.includes(u);
+
+    const locked = lockedNonAdmin || lockedCreator || lockedLastAdmin || lockedOtherAdmin;
     const lockedStyle = locked ? 'opacity:.5;cursor:not-allowed;' : '';
     const lockIcon = locked ? ' 🔒' : '';
     return `<div class="part-chip ${selParts.includes(u)?'sel':''}"
@@ -1311,23 +1317,33 @@ function buildPartsPicker() {
       onclick="togglePart('${u}',this,${locked})">${u}${lockIcon}</div>`;
   }).join('');
 }
+
 function togglePart(name, el, locked) {
-  if (locked) { notify('Admins não podem ser removidos por usuários de vendas.','warn'); return; }
-  const targetIsAdmin = USERS[name]?.role === 'admin';
-  // Vendas: não podem mexer em admins
-  if (!isAdmin() && targetIsAdmin) {
-    notify('Apenas admins podem remover outros admins da conversa.','warn'); return;
+  if (locked) {
+    const creatorName = editId ? ((tickets.find(t=>t.id===editId)||{}).createdBy || me.name) : me.name;
+    const adminsSelected = selParts.filter(p => USERS[p]?.role === 'admin');
+    if (name === creatorName)
+      notify('O criador do ticket não pode ser removido da conversa.','warn');
+    else if (!isAdmin() && selParts.includes(name))
+      notify('Você não pode se remover de um ticket. Peça a um admin.','warn');
+    else if (USERS[name]?.role === 'admin' && name !== me.name)
+      notify('Você não pode remover outros admins da conversa.','warn');
+    else if (adminsSelected.length <= 1)
+      notify('Deve haver pelo menos um admin no ticket.','warn');
+    else
+      notify('Este participante não pode ser removido.','warn');
+    return;
   }
-  // Admin: só pode desmarcar a si mesmo (não outros admins)
-  if (isAdmin() && targetIsAdmin && name !== me.name && selParts.includes(name)) {
-    notify('Cada admin só pode se remover da conversa, não remover outros admins.','warn'); return;
-  }
-  // Criador não pode se remover (somente admin pode fazer isso)
-  if (name === (editId ? (tickets.find(t=>t.id===editId)||{}).createdBy : me.name) && selParts.includes(name) && !isAdmin()) {
-    notify('O criador do ticket não pode ser removido da conversa.','warn'); return;
+  // Admin se desmarcando — verificar se sobra pelo menos 1 admin
+  if (isAdmin() && name === me.name && selParts.includes(name)) {
+    const adminsSelected = selParts.filter(p => USERS[p]?.role === 'admin');
+    if (adminsSelected.length <= 1) {
+      notify('Deve haver pelo menos um admin no ticket.','warn'); return;
+    }
   }
   selParts = selParts.includes(name) ? selParts.filter(x=>x!==name) : [...selParts, name];
   el.classList.toggle('sel', selParts.includes(name));
+  buildPartsPicker(); // re-renderiza para atualizar os cadeados dinamicamente
 }
 
 // ── TAGS PICKER ──────────────────────────────────────────────────
@@ -2243,7 +2259,7 @@ function renderComprasStrip() {
   if (!strip) return;
   const compras = tickets.filter(t =>
     t.urgency === 'compra' && t.deleted !== 'sim' && t.archived !== 'sim' &&
-    (isAdmin() || t.createdBy === me.name)
+    (isAdmin() || t.createdBy === me.name || (t.participants||[]).includes(me.name))
   );
   if (!compras.length) { strip.style.display = 'none'; return; }
   strip.style.display = '';
@@ -2279,7 +2295,7 @@ function renderRefracaoStrip() {
   const refTks = tickets.filter(t =>
     (t.tags||[]).includes(refTag.id) &&
     t.deleted !== 'sim' && t.archived !== 'sim' &&
-    (isAdmin() || t.createdBy === me.name)
+    (isAdmin() || t.createdBy === me.name || (t.participants||[]).includes(me.name))
   );
   if (!refTks.length) { strip.style.display = 'none'; return; }
   strip.style.display = '';

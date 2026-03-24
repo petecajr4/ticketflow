@@ -1749,15 +1749,11 @@ function getRelDates() {
 }
 
 function printRel() {
-  // ✅ NOVO: Obter datas
   const {de, ate} = getRelDates();
-
   const rt  = document.getElementById('relTag').value;
   const ru  = document.getElementById('relUser').value;
   const rs  = document.getElementById('relStatus').value;
   let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
-  
-  // ✅ NOVO: Filtrar por data
   all = all.filter(t => {
     if (!t.createdAt) return true;
     const dt = new Date(t.createdAt);
@@ -1770,60 +1766,87 @@ function printRel() {
   else if (rs) all = all.filter(t=>t.status===rs);
 
   const totalVal = all.reduce((s,t)=>s+(parseFloat(t.valor)||0),0);
-  const urgMap   = {red:'Extrema',yellow:'Média',green:'Baixa'};
-  const colMap   = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
+  const urgMap = {red:'🔴 Extrema',yellow:'🟡 Média',green:'🟢 Baixa'};
+  const colMap = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
+  const orcMap = {'positivado':'✔ Positivado','negativo':'✗ Negativo'};
 
-  const urgMap2 = {red:'Extrema',yellow:'Média',green:'Baixa'};
-  const colMap2 = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
-
-  const ticketsHtml = all.map(t => {
-    const tagN = (t.tags||[]).map(tid=>tags.find(x=>x.id===tid)?.name||'').filter(Boolean).join(', ');
-    const val = parseFloat(t.valor)||0;
-    const dt = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR') : '—';
+  const ticketsHtml = all.map((t, idx) => {
+    const tagN  = (t.tags||[]).map(tid=>tags.find(x=>x.id===tid)?.name||'').filter(Boolean).join(', ');
     const parts = (t.participants||[]).join(', ');
-    const imgs = (t.images||[]).map(src =>
-      `<img src="${src}" style="max-width:160px;max-height:130px;object-fit:contain;border:1px solid #ddd;border-radius:4px;margin:3px;">`
+    const val   = parseFloat(t.valor)||0;
+    const dt    = t.createdAt ? new Date(t.createdAt).toLocaleString('pt-BR') : '—';
+    const imgHtml = (t.images||[]).map(src =>
+      `<img src="${src}" style="max-width:200px;max-height:160px;object-fit:contain;border:1px solid #ddd;border-radius:6px;margin:4px;">`
     ).join('');
+    const statusLabel = t.deleted==='sim' ? '<span style="color:#e55">EXCLUÍDO</span>' : t.archived==='sim' ? '<span style="color:#888">FINALIZADO</span>' : (colMap[t.status]||t.status);
+
     return `
-    <div style="border:1px solid #ddd;border-radius:8px;padding:14px;margin-bottom:14px;page-break-inside:avoid;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+    <div class="ticket-page" ${idx < all.length-1 ? 'style="page-break-after:always"' : ''}>
+      <div class="page-header">
         <div>
-          <span style="font-size:10px;color:#888;">#${String(t.id).slice(-6).toUpperCase()}</span>
-          <div style="font-size:14px;font-weight:700;margin-top:2px;">${t.assunto||''}${t.deleted==='sim'?' <span style="color:#e55">[EXCLUÍDO]</span>':t.archived==='sim'?' <span style="color:#888">[FINALIZADO]</span>':''}</div>
+          <div class="ticket-id">#${String(t.id).slice(-6).toUpperCase()}</div>
+          <div class="ticket-title">${t.assunto||''}</div>
+          <div class="ticket-sub">Aberto por <b>${t.createdBy||''}</b> em ${dt}</div>
         </div>
-        <div style="text-align:right;font-size:11px;color:#666;">
-          ${colMap2[t.status]||''} · ${urgMap2[t.urgency]||''}<br>${dt}
-        </div>
+        <div class="ticket-status">${statusLabel}</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 16px;font-size:11px;color:#555;margin-bottom:8px;">
-        <span><b>Criado por:</b> ${t.createdBy||'—'}</span>
-        <span><b>Responsável:</b> ${t.resp||'—'}</span>
-        <span><b>Valor:</b> ${val>0?'R$ '+val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</span>
-        <span><b>Tags:</b> ${tagN||'—'}</span>
-        <span style="grid-column:span 2"><b>Participantes:</b> ${parts||'—'}</span>
+
+      <div class="section-title">Informações Gerais</div>
+      <div class="grid2">
+        <div class="field"><div class="lbl">Responsável</div><div class="val">${t.resp||'—'}</div></div>
+        <div class="field"><div class="lbl">Urgência</div><div class="val">${urgMap[t.urgency]||'—'}</div></div>
+        <div class="field"><div class="lbl">Valor do Serviço</div><div class="val">${val>0?'R$ '+val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</div></div>
+        <div class="field"><div class="lbl">Tags</div><div class="val">${tagN||'—'}</div></div>
+        <div class="field"><div class="lbl">Participantes</div><div class="val">${parts||'—'}</div></div>
+        ${t.orcStatus ? `<div class="field"><div class="lbl">Resultado Orçamento</div><div class="val">${orcMap[t.orcStatus]||t.orcStatus}</div></div>` : ''}
+        ${t.refResp   ? `<div class="field"><div class="lbl">Resp. Refração</div><div class="val">${t.refResp}</div></div>` : ''}
       </div>
-      ${t.desc ? `<div style="background:#f9f9f9;border-radius:4px;padding:8px;font-size:11px;margin-bottom:8px;color:#444;">${t.desc}</div>` : ''}
-      ${imgs ? `<div style="margin-top:6px;">${imgs}</div>` : ''}
+
+      <div class="section-title">Dados do Cliente</div>
+      <div class="grid2">
+        <div class="field"><div class="lbl">Empresa / Cliente</div><div class="val">${t.empresa||'—'}</div></div>
+        <div class="field"><div class="lbl">Telefone</div><div class="val">${t.telefone||'—'}</div></div>
+        <div class="field" style="grid-column:span 2"><div class="lbl">Endereço</div><div class="val">${t.endereco||'—'}</div></div>
+        <div class="field"><div class="lbl">Pedido Ascont</div><div class="val">${t.ascont||'—'}</div></div>
+        ${t.visitaData ? `<div class="field"><div class="lbl">Data da Visita</div><div class="val">${new Date(t.visitaData+'T00:00:00').toLocaleDateString('pt-BR')}${t.visitaHora?' às '+t.visitaHora:''}</div></div>` : ''}
+      </div>
+
+      ${t.desc ? `<div class="section-title">Descrição / Observações</div><div class="desc-box">${t.desc}</div>` : ''}
+      ${imgHtml  ? `<div class="section-title">Imagens Anexadas</div><div class="imgs-wrap">${imgHtml}</div>` : ''}
     </div>`;
   }).join('');
 
   const w = window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório TicketFlow</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Relatório TicketFlow</title>
   <style>
-    body{font-family:Arial,sans-serif;font-size:12px;padding:24px;color:#222;}
-    h1{font-size:18px;margin-bottom:4px;}
-    .sub{color:#666;font-size:11px;margin-bottom:20px;}
-    .sum{margin-top:20px;padding:12px;background:#f9f9f9;border:1px solid #ddd;border-radius:8px;display:flex;gap:32px;}
-    .sum-item .lbl{font-size:10px;color:#666;text-transform:uppercase;}
-    .sum-item .val{font-size:16px;font-weight:700;margin-top:2px;}
-    @media print{body{padding:12px;}img{page-break-inside:avoid;}}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#222;background:#fff;}
+    .ticket-page{padding:28px 32px;min-height:100vh;display:flex;flex-direction:column;gap:14px;}
+    .page-header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:2px solid #222;margin-bottom:4px;}
+    .ticket-id{font-size:10px;color:#888;margin-bottom:3px;}
+    .ticket-title{font-size:20px;font-weight:700;line-height:1.3;}
+    .ticket-sub{font-size:11px;color:#666;margin-top:4px;}
+    .ticket-status{font-size:13px;font-weight:700;background:#f0f0f0;border-radius:6px;padding:6px 14px;white-space:nowrap;}
+    .section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;border-bottom:1px solid #eee;padding-bottom:4px;}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;}
+    .field .lbl{font-size:9px;text-transform:uppercase;color:#999;margin-bottom:2px;letter-spacing:.04em;}
+    .field .val{font-size:12px;font-weight:600;color:#222;}
+    .desc-box{background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:10px 14px;font-size:12px;line-height:1.7;white-space:pre-wrap;}
+    .imgs-wrap{display:flex;flex-wrap:wrap;gap:8px;}
+    .footer-sum{margin-top:auto;padding:14px 32px;background:#f5f5f5;border-top:2px solid #ddd;display:flex;gap:40px;}
+    .footer-sum .s-lbl{font-size:10px;color:#666;text-transform:uppercase;}
+    .footer-sum .s-val{font-size:16px;font-weight:700;margin-top:2px;}
+    @media print{
+      .ticket-page{padding:20px 24px;}
+      img{page-break-inside:avoid;}
+    }
   </style></head><body>
-  <h1>📋 Relatório TicketFlow</h1>
-  <div class="sub">Gerado em ${new Date().toLocaleString('pt-BR')} por ${me.name} · ${all.length} ticket(s)</div>
   ${ticketsHtml}
-  <div class="sum">
-    <div class="sum-item"><div class="lbl">Total de tickets</div><div class="val">${all.length}</div></div>
-    <div class="sum-item"><div class="lbl">Soma total</div><div class="val">R$ ${totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>
+  <div class="footer-sum">
+    <div><div class="s-lbl">Total de tickets impressos</div><div class="s-val">${all.length}</div></div>
+    <div><div class="s-lbl">Soma total de valores</div><div class="s-val">R$ ${totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>
+    <div><div class="s-lbl">Gerado em</div><div class="s-val" style="font-size:12px;margin-top:4px">${new Date().toLocaleString('pt-BR')} por ${me.name}</div></div>
   </div>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`);

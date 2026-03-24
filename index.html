@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TicketFlow v2.2 — Gestão de Visitas</title>
+<title>TicketFlow v2.3 — Gestão de Visitas</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -390,7 +390,7 @@ header{
 <!-- ══ APP ══ -->
 <div id="app">
   <header>
-    <div class="brand"><div class="brand-dot">🎯</div>TicketFlow <span style="font-size:0.65rem;color:var(--t2);margin-left:4px;opacity:0.7">(v2.2)</span></div>
+    <div class="brand"><div class="brand-dot">🎯</div>TicketFlow <span style="font-size:0.65rem;color:var(--t2);margin-left:4px;opacity:0.7">(v2.3)</span></div>
     <div class="hdr-right">
       <div class="user-pill">
         <span id="hdrName"></span>
@@ -1721,31 +1721,16 @@ function getRelDates() {
 }
 
 function printRel() {
-  // ✅ NOVO: Usar as datas (COMO EM printRefracao)
-  const {de, ate} = getRelDates();
-
   const rt  = document.getElementById('relTag').value;
   const ru  = document.getElementById('relUser').value;
   const rurg= document.getElementById('relUrg').value;
   const rs  = document.getElementById('relStatus').value;
-  
-  let all = tickets.filter(t => {
-    if (t.deleted === 'sim') return false;
-    if (!canSee(t)) return false;
-    
-    // Filtrar por data
-    const dt = t.createdAt ? new Date(t.createdAt) : null;
-    if (dt && (dt < de || dt >= ate)) return false;
-    
-    // Filtros adicionais
-    if (rt  && !(t.tags||[]).includes(rt)) return false;
-    if (ru  && !(t.participants||[]).includes(ru) && t.createdBy!==ru) return false;
-    if (rs === 'positivado' && t.orcStatus!=='positivado') return false;
-    if (rs === 'negativo' && t.orcStatus!=='negativo') return false;
-    if (rs && rs !== 'positivado' && rs !== 'negativo' && t.status!==rs) return false;
-    
-    return true;
-  });
+  let all = tickets.filter(t => canSee(t) && t.deleted !== 'sim');
+  if (rt)  all = all.filter(t=>(t.tags||[]).includes(rt));
+  if (ru)  all = all.filter(t=>(t.participants||[]).includes(ru)||t.createdBy===ru);
+  if (rs === 'positivado') all = all.filter(t=>t.orcStatus==='positivado');
+  else if (rs === 'negativo') all = all.filter(t=>t.orcStatus==='negativo');
+  else if (rs) all = all.filter(t=>t.status===rs);
 
   const totalVal = all.reduce((s,t)=>s+(parseFloat(t.valor)||0),0);
   const urgMap   = {red:'Extrema',yellow:'Média',green:'Baixa'};

@@ -459,7 +459,7 @@ header{
         <input type="date" id="relAte" class="fselect" onchange="renderRel()">
       </div>
 
-      <select class="fselect" id="relStatus"><option value="">Todos status</option><option value="aberto">Aberto</option><option value="em-andamento">Em Andamento</option><option value="finalizado">Finalizado</option><option value="positivado">✔ Positivado</option><option value="negativo">✗ Negativo</option></select>
+      <select class="fselect" id="relStatus"><option value="">Todos status</option><option value="aberto">Aberto</option><option value="em-andamento">Em Andamento</option><option value="aguardando">Aguardando</option><option value="finalizado">Finalizado</option><option value="positivado">✔ Positivado</option><option value="negativo">✗ Negativo</option></select>
       <button class="btn btn-accent" onclick="printRel()">🖨 Imprimir</button>
     </div>
     <div id="relContent"></div>
@@ -740,6 +740,7 @@ const ADMINS = ['Bruno','Rodrigo','Junior'];
 const COLS = [
   {id:'aberto',       label:'Aberto',       color:'#8899c0'},
   {id:'em-andamento', label:'Em Andamento', color:'#5b8aff'},
+  {id:'aguardando',   label:'Aguardando',   color:'#f5b731'},
   {id:'finalizado',   label:'Finalizado',   color:'#1fd080'},
 ];
 
@@ -892,8 +893,10 @@ function parseTicket(t) {
 // ═══════════════════════════════════════════════════════════════
 function canSee(t) {
   if (isAdmin()) return true;
-  // não-admins só veem tickets que criaram
-  return t.createdBy === me.name;
+  // não-admins veem tickets que criaram ou em que são participantes
+  if (t.createdBy === me.name) return true;
+  if ((t.participants||[]).includes(me.name)) return true;
+  return false;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1068,13 +1071,14 @@ async function dropTicket(e, colId) {
   // Regras de fluxo
   const flow = {
     'aberto':       ['em-andamento'],
-    'em-andamento': ['finalizado'],
+    'em-andamento': ['aguardando','finalizado'],
+    'aguardando':   ['em-andamento','finalizado'],
     'finalizado':   ['excluido'],
-    'excluido':     ['em-andamento','finalizado'],
+    'excluido':     ['em-andamento','aguardando','finalizado'],
   };
   const allowed = flow[t.status] || [];
   if (!allowed.includes(colId)) {
-    const labels = {'aberto':'Aberto','em-andamento':'Em Andamento','finalizado':'Finalizado','excluido':'Excluídos'};
+    const labels = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado','excluido':'Excluídos'};
     notify(`Não é possível mover de "${labels[t.status]}" para "${labels[colId]}".`,'err');
     return;
   }
@@ -1086,7 +1090,8 @@ async function dropTicket(e, colId) {
   dragId = null;
   t.status = colId;
   renderBoard();
-  notify('Ticket movido para '+COLS.find(c=>c.id===colId).label);
+  const colLabels = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado','excluido':'Excluídos'};
+  notify('Ticket movido para ' + (COLS.find(c=>c.id===colId)||{label:colLabels[colId]||colId}).label);
 
   // Sincroniza em background
   if (colId === 'finalizado') {
@@ -1176,6 +1181,10 @@ async function openTicket(id) {
   const tStatus = tkt.status;
   const moveBtn = tStatus === 'aberto'
     ? `<button class="btn btn-accent" onclick="moveTicketTo('${id}','em-andamento')">▶ Iniciar atendimento</button>`
+    : tStatus === 'em-andamento'
+    ? `<button class="btn" style="background:rgba(245,183,49,.15);color:var(--yellow);border:1px solid rgba(245,183,49,.35);font-weight:700" onclick="moveTicketTo('${id}','aguardando')">⏸ Aguardando</button>`
+    : tStatus === 'aguardando'
+    ? `<button class="btn btn-accent" onclick="moveTicketTo('${id}','em-andamento')">▶ Retomar atendimento</button>`
     : '';
   const excludeBtn = isAdmin() && tStatus === 'finalizado'
     ? `<button class="btn btn-danger" onclick="excludeTicket('${id}')">🗑 Excluir</button>`
@@ -1212,7 +1221,7 @@ function printTicket(id) {
   if (!t) return;
   const comments = window._lastComments || [];
   const urgMap = {red:'Extrema Urgência',yellow:'Urgência Média',green:'Baixa Urgência'};
-  const colMap = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando (antigo)','finalizado':'Finalizado'};
+  const colMap = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
   const tagNames = (t.tags||[]).map(tid => tags.find(x=>x.id===tid)?.name||'').filter(Boolean).join(', ');
   const parts = (t.participants||[]).join(', ');
   const dt = t.createdAt ? new Date(t.createdAt).toLocaleString('pt-BR') : '—';
@@ -1277,10 +1286,16 @@ function setUrg(u, btn) {
 
 // ── PARTICIPANTES ────────────────────────────────────────────────
 function buildPartsPicker() {
+  // Determinar quem é o criador do ticket atual
+  const creatorName = editId ? ((tickets.find(t=>t.id===editId)||{}).createdBy || me.name) : me.name;
+
   document.getElementById('partsWrap').innerHTML = Object.keys(USERS).map(u => {
     const isAdminUser = USERS[u].role === 'admin';
     // Vendas não podem desmarcar admins
-    const locked = !isAdmin() && isAdminUser;
+    const lockedAdmin = !isAdmin() && isAdminUser;
+    // Criador não pode ser removido por não-admins
+    const lockedCreator = !isAdmin() && u === creatorName && selParts.includes(u);
+    const locked = lockedAdmin || lockedCreator;
     const lockedStyle = locked ? 'opacity:.5;cursor:not-allowed;' : '';
     const lockIcon = locked ? ' 🔒' : '';
     return `<div class="part-chip ${selParts.includes(u)?'sel':''}"
@@ -1298,6 +1313,10 @@ function togglePart(name, el, locked) {
   // Admin: só pode desmarcar a si mesmo (não outros admins)
   if (isAdmin() && targetIsAdmin && name !== me.name && selParts.includes(name)) {
     notify('Cada admin só pode se remover da conversa, não remover outros admins.','warn'); return;
+  }
+  // Criador não pode se remover (somente admin pode fazer isso)
+  if (name === (editId ? (tickets.find(t=>t.id===editId)||{}).createdBy : me.name) && selParts.includes(name) && !isAdmin()) {
+    notify('O criador do ticket não pode ser removido da conversa.','warn'); return;
   }
   selParts = selParts.includes(name) ? selParts.filter(x=>x!==name) : [...selParts, name];
   el.classList.toggle('sel', selParts.includes(name));
@@ -1589,7 +1608,8 @@ async function moveTicketTo(id, newStatus) {
   t.status = newStatus;
   closeOverlay('ticketOverlay');
   renderBoard();
-  notify('Ticket em andamento!');
+  const msgs = {'em-andamento':'Ticket em andamento!','aguardando':'Ticket aguardando!','aberto':'Ticket reaberto!'};
+  notify(msgs[newStatus] || 'Ticket atualizado!');
   callAPI({action:'moveTicket', id, status:newStatus})
     .then(r => { if (!r.ok) notify(r.error,'err'); })
     .catch(() => notify('Erro ao sincronizar.','err'));
@@ -1656,7 +1676,7 @@ function renderRel() {
   const totalVal = all.reduce((s,t) => s+(parseFloat(t.valor)||0), 0);
   const withVal  = all.filter(t => parseFloat(t.valor)>0);
   const urgMap   = {red:'🔴 Extrema',yellow:'🟡 Média',green:'🟢 Baixa'};
-  const colMap   = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando (antigo)','finalizado':'Finalizado'};
+  const colMap   = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
 
   document.getElementById('relContent').innerHTML = `
     <table class="rel-table">
@@ -1743,10 +1763,10 @@ function printRel() {
 
   const totalVal = all.reduce((s,t)=>s+(parseFloat(t.valor)||0),0);
   const urgMap   = {red:'Extrema',yellow:'Média',green:'Baixa'};
-  const colMap   = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando (antigo)','finalizado':'Finalizado'};
+  const colMap   = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
 
   const urgMap2 = {red:'Extrema',yellow:'Média',green:'Baixa'};
-  const colMap2 = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando (antigo)','finalizado':'Finalizado'};
+  const colMap2 = {'aberto':'Aberto','em-andamento':'Em Andamento','aguardando':'Aguardando','finalizado':'Finalizado'};
 
   const ticketsHtml = all.map(t => {
     const tagN = (t.tags||[]).map(tid=>tags.find(x=>x.id===tid)?.name||'').filter(Boolean).join(', ');
@@ -2191,7 +2211,8 @@ function renderComprasStrip() {
   const strip = document.getElementById('comprasStrip');
   if (!strip) return;
   const compras = tickets.filter(t =>
-    t.urgency === 'compra' && t.deleted !== 'sim' && t.archived !== 'sim'
+    t.urgency === 'compra' && t.deleted !== 'sim' && t.archived !== 'sim' &&
+    (isAdmin() || t.createdBy === me.name)
   );
   if (!compras.length) { strip.style.display = 'none'; return; }
   strip.style.display = '';
@@ -2226,7 +2247,8 @@ function renderRefracaoStrip() {
 
   const refTks = tickets.filter(t =>
     (t.tags||[]).includes(refTag.id) &&
-    t.deleted !== 'sim' && t.archived !== 'sim'
+    t.deleted !== 'sim' && t.archived !== 'sim' &&
+    (isAdmin() || t.createdBy === me.name)
   );
   if (!refTks.length) { strip.style.display = 'none'; return; }
   strip.style.display = '';

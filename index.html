@@ -950,9 +950,8 @@ function renderStats() {
   const arch     = tickets.filter(t => t.archived === 'sim' && t.deleted !== 'sim' && canSee(t)).length;
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-card"><div class="stat-label">Tickets Ativos</div><div class="stat-value" style="color:var(--accent)">${total}</div></div>
-    <div class="stat-card"><div class="stat-label">Urgência Extrema</div><div class="stat-value" style="color:var(--red)">${red}</div></div>
     <div class="stat-card"><div class="stat-label">Finalizados</div><div class="stat-value" style="color:var(--green)">${arch}</div></div>
-    <div class="stat-card"><div class="stat-label">Valor Total</div><div class="stat-value" style="color:var(--yellow)">R$ ${totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="stat-sub">tickets visíveis</div></div>`;
+    <div class="stat-card"><div class="stat-label">Valor Total</div><div class="stat-value" style="color:var(--yellow)">R$&nbsp;${totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="stat-sub">tickets visíveis</div></div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════

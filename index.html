@@ -1292,8 +1292,8 @@ function buildPartsPicker() {
     const isAdminUser = USERS[u].role === 'admin';
     // Vendas não podem desmarcar admins
     const lockedAdmin = !isAdmin() && isAdminUser;
-    // Criador não pode ser removido por não-admins
-    const lockedCreator = !isAdmin() && u === creatorName && selParts.includes(u);
+    // Criador não pode ser removido por ninguém
+    const lockedCreator = u === creatorName && selParts.includes(u);
     const locked = lockedAdmin || lockedCreator;
     const lockedStyle = locked ? 'opacity:.5;cursor:not-allowed;' : '';
     const lockIcon = locked ? ' 🔒' : '';

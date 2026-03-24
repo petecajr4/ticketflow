@@ -138,6 +138,8 @@ header{
 .timer{font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;padding:3px 10px;border-radius:20px;background:var(--s3);color:var(--t2);}
 .timer.hot{color:var(--red);background:rgba(255,74,107,.12);}
 .tc-parts{font-size:.73rem;color:var(--t3);}
+.tc-thumb{width:52px;height:52px;border-radius:6px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;cursor:zoom-in;}
+.tc-thumb-wrap{display:flex;gap:4px;margin-bottom:8px;}
 @keyframes pulse-orange {
   0%,100%{box-shadow:0 0 0 0 rgba(255,140,66,.5);}
   50%{box-shadow:0 0 0 8px rgba(255,140,66,0);}
@@ -1015,6 +1017,12 @@ function renderBoard() {
 function ticketCardHTML(t) {
   const tagObjs = (t.tags||[]).map(tid => tags.find(x => x.id === tid)).filter(Boolean);
   const age     = ticketAge(t.createdAt);
+  const imgs    = (t.images||[]).slice(0,3);
+  const thumbsHTML = imgs.length ? `
+    <div class="tc-thumb-wrap">
+      ${imgs.map(src => `<img class="tc-thumb" src="${src}" onclick="event.stopPropagation();openLightbox('${src}')" title="Clique para ampliar">`).join('')}
+      ${(t.images||[]).length > 3 ? `<div style="width:52px;height:52px;border-radius:6px;background:var(--s3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--t2);font-weight:700;">+${(t.images||[]).length-3}</div>` : ''}
+    </div>` : '';
   return `<div class="tcard urg-${t.urgency||'yellow'}" draggable="true" data-id="${t.id}" onclick="openTicket('${t.id}')">
     <div class="tc-top">
       <div class="tc-title">${t.assunto||''}</div>
@@ -1022,6 +1030,7 @@ function ticketCardHTML(t) {
     </div>
     <div class="tc-id">#${String(t.id).slice(-6).toUpperCase()} · ${t.createdBy||''}</div>
     <div class="tc-tags">${tagObjs.map(tg=>`<span class="tag" style="background:${tg.color}22;color:${tg.color};border-color:${tg.color}44">${tg.name}</span>`).join('')}</div>
+    ${thumbsHTML}
     <div class="tc-meta">
       ${t.resp  ? `<span>👤 ${t.resp}</span>`:''}
       ${t.valor ? `<span>💰 R$ ${parseFloat(t.valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`:''}
@@ -2442,7 +2451,7 @@ function notify(msg, type) {
 }
 
 document.querySelectorAll('.overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target===el) closeOverlay(el.id); });
+  // Overlay só fecha pelo botão ✕ ou Cancelar — não ao clicar fora
 });
 
 // ─── INIT ────────────────────────────────────────────────────────
